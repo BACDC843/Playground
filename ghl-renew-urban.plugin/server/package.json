@@ -1,16 +1,16 @@
 {
   "name": "ghl-renew-urban-mcp-server",
   "version": "1.0.0",
-  "description": "MCP server exposing GoHighLevel CRM API tools for the ghl-renew-urban plugin",
+  "description": "MCP server exposing GoHighLevel CRM and Social Planner API tools",
   "type": "module",
   "main": "index.js",
-  "bin": {
-    "ghl-mcp-server": "./index.js"
-  },
   "scripts": {
-    "start": "node index.js"
+    "start": "node http-server.js",
+    "start:stdio": "node index.js",
+    "dev": "node --watch http-server.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "express": "^5.2.1"
   }
 }
