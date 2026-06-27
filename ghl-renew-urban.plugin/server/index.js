@@ -156,6 +156,155 @@ const TOOLS = [
       properties: {},
     },
   },
+
+  // ── Social Planner ─────────────────────────────────────────────────────────
+
+  {
+    name: "ghl_social_get_accounts",
+    description:
+      "List all connected social media accounts (Facebook, Instagram, LinkedIn, TikTok, Google, etc.) for the GHL location.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "ghl_social_list_posts",
+    description:
+      "List scheduled, published, draft, or failed social media posts. Optionally filter by date range, account, status, or post type.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          enum: ["all", "scheduled", "published", "draft", "failed", "in_review", "deleted"],
+          description: "Post status filter (default: all)",
+        },
+        fromDate: {
+          type: "string",
+          description: "Start date ISO 8601 (default: 30 days ago)",
+        },
+        toDate: {
+          type: "string",
+          description: "End date ISO 8601 (default: 90 days from now)",
+        },
+        accounts: {
+          type: "string",
+          description: "Comma-separated account IDs to filter by (default: all connected accounts)",
+        },
+        skip: { type: "number", description: "Pagination offset (default 0)" },
+        limit: { type: "number", description: "Max results (default 20)" },
+        postType: {
+          type: "string",
+          enum: ["post", "story", "reel"],
+          description: "Filter by post type",
+        },
+      },
+    },
+  },
+  {
+    name: "ghl_social_get_post",
+    description: "Get full details for a single social media post by ID.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        postId: { type: "string", description: "Social post ID" },
+      },
+      required: ["postId"],
+    },
+  },
+  {
+    name: "ghl_social_create_post",
+    description:
+      "Create and schedule (or save as draft) a social media post to one or more connected accounts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        accountIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Account IDs to post to. Use ghl_social_get_accounts to retrieve IDs.",
+        },
+        summary: {
+          type: "string",
+          description: "Post caption / text content",
+        },
+        status: {
+          type: "string",
+          enum: ["scheduled", "draft"],
+          description: "Use 'scheduled' to publish at scheduleDate, 'draft' to save without scheduling",
+        },
+        scheduleDate: {
+          type: "string",
+          description: "ISO 8601 datetime to publish (required when status is 'scheduled')",
+        },
+        media: {
+          type: "array",
+          description: "Optional media attachments",
+          items: {
+            type: "object",
+            properties: {
+              url: { type: "string", description: "Public URL of image or video" },
+              type: { type: "string", description: "MIME type e.g. image/jpeg, video/mp4" },
+            },
+            required: ["url", "type"],
+          },
+        },
+        followUpComment: {
+          type: "string",
+          description: "First comment to post automatically (not supported on TikTok/GMB; max 280 chars on Twitter)",
+        },
+        postType: {
+          type: "string",
+          enum: ["post", "story", "reel"],
+          description: "Post format (default: post)",
+        },
+      },
+      required: ["accountIds", "summary", "status"],
+    },
+  },
+  {
+    name: "ghl_social_update_post",
+    description: "Edit an existing social media post (caption, schedule date, accounts, media, status).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        postId: { type: "string", description: "Social post ID to update" },
+        updates: {
+          type: "object",
+          description: "Fields to update (same shape as ghl_social_create_post body)",
+        },
+      },
+      required: ["postId", "updates"],
+    },
+  },
+  {
+    name: "ghl_social_delete_post",
+    description: "Delete a single social media post by ID.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        postId: { type: "string", description: "Social post ID to delete" },
+      },
+      required: ["postId"],
+    },
+  },
+  {
+    name: "ghl_social_get_categories",
+    description: "List all social planner post categories for the location.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "ghl_social_get_tags",
+    description: "List all social planner tags for the location.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
 ];
 
 async function callTool(name, args) {
@@ -220,6 +369,88 @@ async function callTool(name, args) {
       const params = new URLSearchParams({ locationId: GHL_LOCATION_ID });
       const data = await ghlFetch(`/opportunities/pipelines?${params}`);
       return data.pipelines ?? data;
+    }
+
+    // ── Social Planner ───────────────────────────────────────────────────────
+
+    case "ghl_social_get_accounts": {
+      const data = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/accounts`);
+      return data.results ?? data;
+    }
+
+    case "ghl_social_list_posts": {
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now - 30 * 86400000).toISOString();
+      const ninetyDaysOut = new Date(now.getTime() + 90 * 86400000).toISOString();
+
+      const body = {
+        skip: String(args.skip ?? 0),
+        limit: String(args.limit ?? 20),
+        fromDate: args.fromDate ?? thirtyDaysAgo,
+        toDate: args.toDate ?? ninetyDaysOut,
+        includeUsers: "true",
+        ...(args.type && { type: args.type }),
+        ...(args.accounts && { accounts: args.accounts }),
+        ...(args.postType && { postType: args.postType }),
+      };
+
+      const data = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/posts/list`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      return data.results ?? data;
+    }
+
+    case "ghl_social_get_post": {
+      const data = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/posts/${args.postId}`);
+      return data.results ?? data.post ?? data;
+    }
+
+    case "ghl_social_create_post": {
+      const payload = {
+        accountIds: args.accountIds,
+        summary: args.summary,
+        status: args.status,
+        ...(args.scheduleDate && { scheduleDate: args.scheduleDate }),
+        ...(args.media && { media: args.media }),
+        ...(args.followUpComment && { followUpComment: args.followUpComment }),
+        ...(args.postType && { type: args.postType }),
+      };
+
+      const data = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/posts`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      return data.results ?? data.post ?? data;
+    }
+
+    case "ghl_social_update_post": {
+      const data = await ghlFetch(
+        `/social-media-posting/${GHL_LOCATION_ID}/posts/${args.postId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(args.updates),
+        }
+      );
+      return data.results ?? data.post ?? data;
+    }
+
+    case "ghl_social_delete_post": {
+      const data = await ghlFetch(
+        `/social-media-posting/${GHL_LOCATION_ID}/posts/${args.postId}`,
+        { method: "DELETE" }
+      );
+      return data;
+    }
+
+    case "ghl_social_get_categories": {
+      const data = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/categories`);
+      return data.results ?? data;
+    }
+
+    case "ghl_social_get_tags": {
+      const data = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/tags`);
+      return data.results ?? data;
     }
 
     default:
