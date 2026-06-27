@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1080px; height: 1080px; overflow: hidden; }
+</style>
+</head>
+<body>
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#c9a84c"/>
+      <stop offset="100%" style="stop-color:#e8c96d"/>
+    </linearGradient>
+    <linearGradient id="goldV" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8c96d"/>
+      <stop offset="100%" style="stop-color:#c9a84c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#c9a84c;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#c9a84c;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#c9a84c" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+
+  <!-- Radial glow center -->
+  <ellipse cx="540" cy="520" rx="420" ry="380" fill="url(#glow)"/>
+
+  <!-- Gold bars -->
+  <rect x="0" y="0" width="1080" height="6" fill="url(#gold)"/>
+  <rect x="0" y="1074" width="1080" height="6" fill="url(#gold)"/>
+  <!-- Side accent bars -->
+  <rect x="0" y="0" width="6" height="1080" fill="url(#goldV)"/>
+  <rect x="1074" y="0" width="6" height="1080" fill="url(#goldV)"/>
+
+  <!-- Decorative corner ornaments -->
+  <!-- Top left -->
+  <line x1="40" y1="40" x2="100" y2="40" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+  <line x1="40" y1="40" x2="40" y2="100" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+  <!-- Top right -->
+  <line x1="1040" y1="40" x2="980" y2="40" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+  <line x1="1040" y1="40" x2="1040" y2="100" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+  <!-- Bottom left -->
+  <line x1="40" y1="1040" x2="100" y2="1040" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+  <line x1="40" y1="1040" x2="40" y2="980" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+  <!-- Bottom right -->
+  <line x1="1040" y1="1040" x2="980" y2="1040" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+  <line x1="1040" y1="1040" x2="1040" y2="980" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.5"/>
+
+  <!-- Brand + slide number -->
+  <text x="54" y="60" font-family="'Georgia', serif" font-size="22" fill="#ffffff" letter-spacing="3">RENEW</text>
+  <text x="122" y="60" font-family="'Georgia', serif" font-size="22" fill="#c9a84c" letter-spacing="3"> URBAN</text>
+  <rect x="54" y="65" width="120" height="1.5" fill="#c9a84c"/>
+  <text x="54" y="112" font-family="'Arial', sans-serif" font-size="13" fill="#c9a84c" letter-spacing="4" font-weight="300">05 / 05</text>
+
+  <!-- Kitchen pot / icon center top -->
+  <!-- Simple elegant kitchen line icon -->
+  <g transform="translate(440, 180)">
+    <!-- Pan -->
+    <ellipse cx="100" cy="80" rx="70" ry="20" fill="none" stroke="#c9a84c" stroke-width="2"/>
+    <rect x="30" y="60" width="140" height="40" fill="none" stroke="#c9a84c" stroke-width="2" rx="4"/>
+    <ellipse cx="100" cy="100" rx="70" ry="20" fill="none" stroke="#c9a84c" stroke-width="2"/>
+    <!-- Handle -->
+    <rect x="170" y="72" width="50" height="16" fill="none" stroke="#c9a84c" stroke-width="2" rx="8"/>
+    <!-- Steam lines -->
+    <path d="M60 50 Q65 40 60 30" fill="none" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.6"/>
+    <path d="M100 45 Q105 35 100 25" fill="none" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.6"/>
+    <path d="M140 50 Q145 40 140 30" fill="none" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.6"/>
+  </g>
+
+  <!-- Main CTA text -->
+  <text x="540" y="380" font-family="'Arial', sans-serif" font-size="15" fill="#c9a84c" text-anchor="middle" letter-spacing="6" font-weight="300">READY TO TRANSFORM?</text>
+
+  <text x="540" y="460" font-family="'Georgia', serif" font-size="80" fill="#ffffff" text-anchor="middle" font-weight="400" letter-spacing="-2">Your Dream</text>
+  <text x="540" y="548" font-family="'Georgia', serif" font-size="80" fill="url(#gold)" text-anchor="middle" font-weight="400" letter-spacing="-2">Kitchen</text>
+  <text x="540" y="636" font-family="'Georgia', serif" font-size="80" fill="#ffffff" text-anchor="middle" font-weight="400" letter-spacing="-2">Awaits</text>
+
+  <!-- Divider -->
+  <rect x="340" y="665" width="400" height="2" fill="url(#gold)"/>
+
+  <!-- Tagline -->
+  <text x="540" y="710" font-family="'Arial', sans-serif" font-size="18" fill="#ccccdd" text-anchor="middle" font-weight="300" letter-spacing="1">Schedule your FREE in-home consultation today.</text>
+  <text x="540" y="738" font-family="'Arial', sans-serif" font-size="18" fill="#ccccdd" text-anchor="middle" font-weight="300">No pressure. Just possibilities.</text>
+
+  <!-- CTA Button -->
+  <rect x="290" y="780" width="500" height="80" fill="url(#gold)" rx="40" filter="url(#shadow)"/>
+  <text x="540" y="830" font-family="'Arial', sans-serif" font-size="22" fill="#1a1a2e" text-anchor="middle" font-weight="700" letter-spacing="3">BOOK FREE CONSULTATION</text>
+
+  <!-- Contact info row -->
+  <text x="540" y="910" font-family="'Arial', sans-serif" font-size="16" fill="#c9a84c" text-anchor="middle" letter-spacing="1">📞  Call or Text Us Today</text>
+
+  <!-- Social handles -->
+  <text x="260" y="970" font-family="'Arial', sans-serif" font-size="15" fill="#9999bb" text-anchor="middle" letter-spacing="1">@renewurban</text>
+  <circle cx="310" cy="965" r="2" fill="#c9a84c"/>
+  <text x="540" y="970" font-family="'Arial', sans-serif" font-size="15" fill="#9999bb" text-anchor="middle" letter-spacing="1">renewurban.com</text>
+  <circle cx="770" cy="965" r="2" fill="#c9a84c"/>
+  <text x="820" y="970" font-family="'Arial', sans-serif" font-size="15" fill="#9999bb" text-anchor="middle" letter-spacing="1">@renewurban</text>
+
+  <!-- Divider bottom -->
+  <rect x="160" y="985" width="760" height="1" fill="#c9a84c" fill-opacity="0.2"/>
+  <text x="540" y="1058" font-family="'Arial', sans-serif" font-size="13" fill="#555577" text-anchor="middle" letter-spacing="2">RENEW URBAN  ·  KITCHEN RENOVATIONS  ·  TRANSFORM YOUR SPACE</text>
+</svg>
+</body>
+</html>
