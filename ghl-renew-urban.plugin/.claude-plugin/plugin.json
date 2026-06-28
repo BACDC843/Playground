@@ -1,0 +1,11 @@
+{
+  "name": "ghl-renew-urban",
+  "description": "GoHighLevel Urban renewal workflow plugin — refresh contacts, opportunities, and sync urban project data in GHL CRM.",
+  "version": "1.0.0",
+  "author": {
+    "name": "CHS Media Group",
+    "email": "barry@chsmediagroup.com"
+  },
+  "homepage": "https://github.com/bacdc843/playground",
+  "repository": "https://github.com/bacdc843/playground"
+}
