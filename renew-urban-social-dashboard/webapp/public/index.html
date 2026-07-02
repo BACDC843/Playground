@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Renew Urban — Social Dashboard</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<!-- PRINT HEADER (hidden on screen, shown when printing) -->
+<div class="print-header">
+  <h1>RENEW <span>URBAN</span></h1>
+  <p id="print-period">Social Media Performance Report</p>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="logo">RENEW <span>URBAN</span></div>
+  <div class="date-nav">
+    <button class="nbtn" id="prevBtn">‹</button>
+    <span class="period" id="periodLabel">—</span>
+    <button class="nbtn" id="nextBtn">›</button>
+    <div class="vtog">
+      <button class="vbtn on" id="monthBtn">Month</button>
+      <button class="vbtn" id="weekBtn">Week</button>
+    </div>
+  </div>
+  <button class="share-btn" id="shareBtn">📤 Share Report</button>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab on" data-tab="overview">📊 Overview</button>
+  <button class="tab" data-tab="ig">📷 Instagram</button>
+  <button class="tab" data-tab="fb">👍 Facebook</button>
+  <button class="tab" data-tab="insights">🧠 Insights</button>
+</div>
+
+<!-- DATE RANGE PICKER -->
+<div class="drbar">
+  <span class="drlbl">DATE RANGE</span>
+  <input type="date" id="drFrom" class="drinput" />
+  <span class="drsep">→</span>
+  <input type="date" id="drTo" class="drinput" />
+  <button id="drApply" class="drapply">Apply</button>
+  <button id="drClear" class="drclear">✕ Clear Range</button>
+</div>
+
+<!-- CONTENT -->
+<div class="main">
+  <div id="no-data-banner" style="display:none;background:#fff8e1;border:1.5px solid #f0c040;border-radius:10px;padding:14px 18px;margin:12px 16px;font-size:13px;color:#5a4500;">
+    ⚠️ <strong>No posts found for this period.</strong>
+  </div>
+  <div id="config-banner" style="display:none;background:#f8d7da;border:1.5px solid #dc3545;border-radius:10px;padding:14px 18px;margin:12px 16px;font-size:13px;color:#58151c;">
+    ⚠️ <strong>Server isn't configured yet.</strong> Copy <code>server/.env.example</code> to <code>server/.env</code>, add your Meta access token, and restart the server.
+  </div>
+  <div class="ldg" id="ldg"><div class="spin"></div>Loading social data…</div>
+
+  <div class="panel on" id="tab-overview"></div>
+  <div class="panel" id="tab-ig"></div>
+  <div class="panel" id="tab-fb"></div>
+  <div class="panel" id="tab-insights" style="display:none"></div>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="moverlay" id="modal" style="display:none">
+  <div class="modal">
+    <div class="mhdr">
+      <div class="mttl">📤 Share Report</div>
+      <button class="mclose" id="mclose">✕</button>
+    </div>
+    <div class="mbdy">
+      <div class="msub" id="msub">Choose how to share your performance summary.</div>
+      <div class="sopt" id="opt-pdf">
+        <div class="soi">🖨️</div>
+        <div>
+          <div class="sott">Print / Save as PDF</div>
+          <div class="sotd">Opens the browser print dialog. Select "Save as PDF" to create a clean, branded report you can email directly to clients.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "renew-urban-social-dashboard-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone server for the Renew Urban social dashboard -- proxies the Meta Graph API and serves the static frontend.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5"
+  }
+}

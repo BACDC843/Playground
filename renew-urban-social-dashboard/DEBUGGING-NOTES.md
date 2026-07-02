@@ -3,6 +3,14 @@
 **Dashboard ID:** `renew-urban-social-dashboard`
 **Meta Plugin:** `mcp__plugin_meta-social-insights_meta-social-insights__*`
 
+> **2026-07-02:** Added `webapp/` — a standalone Node/Express + plain-JS
+> version of this same dashboard that does not depend on the Cowork
+> artifact sandbox at all (no `window.cowork`, no `mcpTools` registration,
+> no CSP image workarounds). Built because the Cowork sandbox's
+> `callMcpTool` flakiness documented below made the artifact version
+> unreliable. See `webapp/README.md` for setup. Everything below this line
+> describes the *original artifact* (`index.html`) and still applies to it.
+
 ---
 
 ## Architecture Overview
