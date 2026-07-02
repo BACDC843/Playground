@@ -712,7 +712,7 @@ function buildRuleInsights(){
 function renderLiveBar(){
   const refreshed=DATA.refreshedAt?fmtRefreshDate(DATA.refreshedAt):'—';
   const btn='<button onclick="loadData()" style="margin-left:auto;background:#155724;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Reload</button>';
-  return '<div class="live-bar" style="display:flex;align-items:center;">✅ '+getPeriod()+' · Refreshed '+refreshed+' '+btn+'</div>';
+  return '<div class="live-bar" style="display:flex;align-items:center;">✅ '+getPeriod()+' · Refreshed '+refreshed+' · auto-updates every 5 min '+btn+'</div>';
 }
 
 function renderInsights(){
@@ -977,6 +977,25 @@ document.getElementById('drClear').addEventListener('click',()=>{
   loadData();
 });
 
+// ── AUTO-REFRESH ──────────────────────────────────────
+// Refetches the currently-viewed date range on an interval so a client with
+// this page open sees new posts/numbers without having to click Reload.
+// Paused while the tab isn't visible so a browser left open overnight isn't
+// silently hammering the Meta API the whole time.
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+let autoRefreshTimer = null;
+function startAutoRefresh(){
+  stopAutoRefresh();
+  autoRefreshTimer = setInterval(()=>{ if(document.visibilityState==='visible') loadData(); }, AUTO_REFRESH_MS);
+}
+function stopAutoRefresh(){
+  if(autoRefreshTimer){ clearInterval(autoRefreshTimer); autoRefreshTimer=null; }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') loadData(); // catch up immediately on return
+});
+
 // ── INIT ──────────────────────────────────────────────
 setTab(tab, true);
 loadData();
+startAutoRefresh();

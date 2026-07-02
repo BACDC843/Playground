@@ -76,3 +76,45 @@ API calls and returns plain JSON.
 mock server that returns canned JSON in the same shape as the real Graph API
 is how this was verified end-to-end during development, without needing
 real credentials.
+
+## Auto-refresh
+
+The page automatically re-fetches the currently-viewed date range every 5
+minutes while the tab is visible (and immediately when you switch back to
+it), so a client with the dashboard open sees new data without touching
+anything. See `AUTO_REFRESH_MS` near the bottom of `public/app.js` to change
+the interval.
+
+## Deploying so clients can see it (Railway)
+
+`localhost` only works on the machine it's running on. To share this with
+clients, it needs to run on a real hosting service instead. This ships with
+a `server/railway.json` for deploying to [Railway](https://railway.app),
+which doesn't require a GitHub repo -- its CLI uploads your local folder
+directly.
+
+1. Create a free account at [railway.app](https://railway.app).
+2. Install the Railway CLI and log in (this opens a browser tab to confirm):
+   ```bash
+   npm install -g @railway/cli
+   railway login
+   ```
+3. From inside `webapp/server`, create a Railway project and deploy:
+   ```bash
+   cd webapp/server
+   railway init
+   railway up
+   ```
+4. Set your Meta token as a variable on Railway (never put it in code):
+   ```bash
+   railway variables --set "META_ACCESS_TOKEN=your-real-token-here"
+   ```
+   Re-run `railway up` after setting variables so the running server picks
+   them up.
+5. Run `railway domain` (or check the project in the Railway dashboard) to
+   get the public URL -- that's the link to share with clients.
+
+To use your own domain instead of the railway.app one, add a custom domain
+in the Railway project's Settings tab and follow its DNS instructions (a
+CNAME record pointing a subdomain like `dashboard.yourdomain.com` at
+Railway).
