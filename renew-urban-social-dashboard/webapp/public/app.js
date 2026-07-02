@@ -147,8 +147,8 @@ async function loadData(){
       igPosts:body.previous.igPosts||[], fbPosts:body.previous.fbPosts||[],
       igIns:body.previous.igIns||null, fbIns:body.previous.fbIns||null,
     }:null;
-    const failed=Object.entries(cur.errors||{}).filter(([,v])=>v).map(([k])=>k);
-    showError(failed.length?('Partial data this refresh — failed: '+failed.join(', ')):null);
+    const failed=Object.entries(cur.errors||{}).filter(([,v])=>v);
+    showError(failed.length?('Partial data this refresh — '+failed.map(([k,v])=>k+': '+v).join(' | ')):null);
   }catch(err){
     showError('Network error: '+err.message);
     showLoading(false);

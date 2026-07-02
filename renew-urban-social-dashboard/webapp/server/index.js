@@ -98,6 +98,15 @@ async function fetchBundle(since, until) {
   ]);
   const pick = (r) => (r.status === 'fulfilled' ? r.value : null);
   const err = (r) => (r.status === 'rejected' ? String(r.reason?.message || r.reason) : null);
+  const errors = {
+    igPosts: err(igPosts),
+    fbPosts: err(fbPosts),
+    igIns: err(igIns),
+    fbIns: err(fbIns),
+  };
+  for (const [field, message] of Object.entries(errors)) {
+    if (message) console.error(`[${since}..${until}] ${field} failed: ${message}`);
+  }
   return {
     since,
     until,
@@ -105,12 +114,7 @@ async function fetchBundle(since, until) {
     fbPosts: pick(fbPosts),
     igIns: pick(igIns),
     fbIns: pick(fbIns),
-    errors: {
-      igPosts: err(igPosts),
-      fbPosts: err(fbPosts),
-      igIns: err(igIns),
-      fbIns: err(fbIns),
-    },
+    errors,
   };
 }
 
