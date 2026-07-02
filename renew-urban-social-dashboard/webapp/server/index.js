@@ -16,7 +16,12 @@ const {
 
 const IG_POST_FIELDS = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
 const FB_POST_FIELDS = 'id,message,full_picture,permalink_url,created_time,likes.summary(true),comments.summary(true),shares';
-const IG_INSIGHT_METRICS = 'reach,follower_count,profile_views,website_clicks,accounts_engaged';
+// As of a recent Graph API version, IG insights metrics are split into two
+// families that can't be requested together: time-series metrics (daily
+// values) and "total value" metrics, which now require an explicit
+// metric_type=total_value param or the call is rejected outright.
+const IG_TIME_SERIES_METRICS = 'reach,follower_count';
+const IG_TOTAL_VALUE_METRICS = 'profile_views,website_clicks,accounts_engaged';
 const FB_INSIGHT_METRICS = 'page_post_engagements,page_views_total';
 
 const TIMEOUT_MS = 15000;
@@ -67,13 +72,23 @@ async function getFBPosts(since, until) {
 }
 
 async function getIGInsights(since, until) {
-  const data = await graphGet(`${META_IG_ID}/insights`, {
-    metric: IG_INSIGHT_METRICS,
-    period: 'day',
-    since,
-    until: cappedUntil(until),
-  });
-  return data ?? null;
+  const capped = cappedUntil(until);
+  const [timeSeries, totals] = await Promise.all([
+    graphGet(`${META_IG_ID}/insights`, {
+      metric: IG_TIME_SERIES_METRICS,
+      period: 'day',
+      since,
+      until: capped,
+    }),
+    graphGet(`${META_IG_ID}/insights`, {
+      metric: IG_TOTAL_VALUE_METRICS,
+      period: 'day',
+      metric_type: 'total_value',
+      since,
+      until: capped,
+    }),
+  ]);
+  return { data: [...(timeSeries?.data ?? []), ...(totals?.data ?? [])] };
 }
 
 async function getFBInsights(since, until) {
