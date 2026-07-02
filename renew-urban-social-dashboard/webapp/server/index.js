@@ -16,13 +16,23 @@ const {
 
 const IG_POST_FIELDS = 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
 const FB_POST_FIELDS = 'id,message,full_picture,permalink_url,created_time,likes.summary(true),comments.summary(true),shares';
-// As of a recent Graph API version, IG insights metrics are split into two
-// families that can't be requested together: time-series metrics (daily
-// values) and "total value" metrics, which now require an explicit
-// metric_type=total_value param or the call is rejected outright.
-const IG_TIME_SERIES_METRICS = 'reach,follower_count';
-const IG_TOTAL_VALUE_METRICS = 'profile_views,website_clicks,accounts_engaged';
-const FB_INSIGHT_METRICS = 'page_post_engagements,page_views_total';
+// Meta's IG insights metrics each carry their own, frequently-changing rules
+// (some need metric_type=total_value, follower_count only covers a trailing
+// 30-day window that excludes today, etc). Rather than chase each one,
+// every metric is fetched independently below -- one metric being
+// unavailable for a given date range no longer takes the other four down
+// with it.
+const IG_METRICS = [
+  { name: 'reach' },
+  { name: 'follower_count' },
+  { name: 'profile_views', metric_type: 'total_value' },
+  { name: 'website_clicks', metric_type: 'total_value' },
+  { name: 'accounts_engaged', metric_type: 'total_value' },
+];
+const FB_METRICS = [
+  { name: 'page_post_engagements' },
+  { name: 'page_views_total' },
+];
 
 const TIMEOUT_MS = 15000;
 
@@ -71,34 +81,41 @@ async function getFBPosts(since, until) {
   return data?.data ?? [];
 }
 
+// Fetches each metric as its own Graph API call so one metric's rules
+// (date-range limits, required params) can't take the others down with it.
+// Only throws if every single metric failed -- a partial result is treated
+// as success, with the failures logged for visibility.
+async function getInsightsPerMetric(id, metrics, since, until) {
+  const results = await Promise.allSettled(metrics.map((m) =>
+    graphGet(`${id}/insights`, {
+      metric: m.name,
+      period: 'day',
+      ...(m.metric_type ? { metric_type: m.metric_type } : {}),
+      since,
+      until,
+    })
+  ));
+  const data = [];
+  const failures = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      const item = r.value?.data?.[0];
+      if (item) data.push(item);
+    } else {
+      failures.push(`${metrics[i].name}: ${r.reason?.message || r.reason}`);
+    }
+  });
+  if (failures.length) console.warn(`[${since}..${until}] some metrics on ${id} unavailable -- ${failures.join(' | ')}`);
+  if (data.length === 0 && failures.length > 0) throw new Error(failures.join(' | '));
+  return { data };
+}
+
 async function getIGInsights(since, until) {
-  const capped = cappedUntil(until);
-  const [timeSeries, totals] = await Promise.all([
-    graphGet(`${META_IG_ID}/insights`, {
-      metric: IG_TIME_SERIES_METRICS,
-      period: 'day',
-      since,
-      until: capped,
-    }),
-    graphGet(`${META_IG_ID}/insights`, {
-      metric: IG_TOTAL_VALUE_METRICS,
-      period: 'day',
-      metric_type: 'total_value',
-      since,
-      until: capped,
-    }),
-  ]);
-  return { data: [...(timeSeries?.data ?? []), ...(totals?.data ?? [])] };
+  return getInsightsPerMetric(META_IG_ID, IG_METRICS, since, cappedUntil(until));
 }
 
 async function getFBInsights(since, until) {
-  const data = await graphGet(`${META_FB_PAGE_ID}/insights`, {
-    metric: FB_INSIGHT_METRICS,
-    period: 'day',
-    since,
-    until: cappedUntil(until),
-  });
-  return data ?? null;
+  return getInsightsPerMetric(META_FB_PAGE_ID, FB_METRICS, since, cappedUntil(until));
 }
 
 // Fetches all four Meta endpoints for one date range in parallel. Failures
