@@ -244,10 +244,133 @@ async function fetchBundle(since, until) {
   };
 }
 
+// One calendar month, `monthsAgo` months back from the current one (0 = this month).
+function monthRange(monthsAgo) {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+  const y = d.getFullYear(), m = d.getMonth();
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  return {
+    since: `${y}-${String(m + 1).padStart(2, '0')}-01`,
+    until: `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+  };
+}
+
+function metricTotal(insightsData, name) {
+  if (!insightsData) return null;
+  const item = insightsData.data.find((d) => d.name === name);
+  if (!item) return null;
+  if (item.total_value) return item.total_value.value || 0;
+  return (item.values || []).reduce((a, v) => a + (v.value || 0), 0);
+}
+
+// Insights-only rollup per month (no post fetching -- this is for the
+// multi-month trend view, where fetching full post lists for 6+ months
+// would be a lot of unnecessary pagination for numbers the trend doesn't
+// need). Each month's IG/FB insights fetch already degrades gracefully
+// per-metric, so a bad month just shows nulls for whatever failed rather
+// than breaking the whole trend.
+async function getMonthRollup(range) {
+  const [igIns, fbIns] = await Promise.allSettled([
+    getIGInsights(range.since, range.until),
+    getFBInsights(range.since, range.until),
+  ]);
+  const ig = igIns.status === 'fulfilled' ? igIns.value : null;
+  const fb = fbIns.status === 'fulfilled' ? fbIns.value : null;
+  return {
+    month: range.since.slice(0, 7),
+    label: range.label,
+    igReach: metricTotal(ig, 'reach'),
+    igAccsEng: metricTotal(ig, 'accounts_engaged'),
+    igNewFollowers: metricTotal(ig, 'follower_count'),
+    fbReach: metricTotal(fb, 'page_impressions_unique'),
+    fbEng: metricTotal(fb, 'page_post_engagements'),
+    fbNewFans: metricTotal(fb, 'page_fan_adds'),
+  };
+}
+
 const app = express();
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, tokenConfigured: Boolean(META_ACCESS_TOKEN) });
+});
+
+app.get('/api/trend', async (req, res) => {
+  if (!META_ACCESS_TOKEN) {
+    res.status(503).json({ error: 'META_ACCESS_TOKEN is not configured on the server (see server/.env.example)' });
+    return;
+  }
+  const months = Math.min(Math.max(parseInt(req.query.months, 10) || 6, 1), 12);
+  const ranges = Array.from({ length: months }, (_, i) => monthRange(months - 1 - i)); // oldest first
+  try {
+    const trend = await Promise.all(ranges.map(getMonthRollup));
+    res.json({ trend });
+  } catch (err) {
+    res.status(500).json({ error: String(err?.message || err) });
+  }
+});
+
+// Best-effort "did the business reply to comments" rollup for one period.
+// Unlike the main posts/insights fetches, this makes one extra Graph API
+// call per post (to see who commented), so it's kept separate and
+// completely optional -- if anything about it fails (rate limit, an
+// unexpected comment field shape, whatever), the whole feature just
+// reports itself unavailable rather than affecting the rest of the
+// dashboard.
+async function getCommentAuthors(postId) {
+  const body = await graphGet(`${postId}/comments`, { fields: 'from', limit: 50 });
+  return body?.data ?? [];
+}
+
+app.get('/api/community', async (req, res) => {
+  const { since, until } = req.query;
+  if (!since || !until) {
+    res.status(400).json({ error: 'since and until (YYYY-MM-DD) are required query params' });
+    return;
+  }
+  if (!META_ACCESS_TOKEN) {
+    res.status(503).json({ available: false, reason: 'not configured' });
+    return;
+  }
+  try {
+    const [igPosts, fbPosts] = await Promise.all([
+      getIGPosts(since, until),
+      getFBPosts(since, until),
+    ]);
+    const allPosts = [
+      ...igPosts.filter((p) => (p.comments_count || 0) > 0).map((p) => ({ id: p.id })),
+      ...fbPosts.filter((p) => (p.comments?.summary?.total_count || 0) > 0).map((p) => ({ id: p.id })),
+    ];
+    if (allPosts.length === 0) {
+      res.json({ available: true, postsWithComments: 0, postsWithReply: 0, replyRate: null });
+      return;
+    }
+    const results = await Promise.allSettled(allPosts.map((p) => getCommentAuthors(p.id)));
+    let fetchedAny = false;
+    let postsWithReply = 0;
+    results.forEach((r) => {
+      if (r.status !== 'fulfilled') return;
+      fetchedAny = true;
+      const repliedByBusiness = r.value.some((c) => {
+        const fromId = c.from?.id;
+        return fromId === META_IG_ID || fromId === META_FB_PAGE_ID;
+      });
+      if (repliedByBusiness) postsWithReply += 1;
+    });
+    if (!fetchedAny) {
+      res.json({ available: false, reason: 'comment authors could not be read for this account' });
+      return;
+    }
+    res.json({
+      available: true,
+      postsWithComments: allPosts.length,
+      postsWithReply,
+      replyRate: Math.round((postsWithReply / allPosts.length) * 100),
+    });
+  } catch (err) {
+    res.json({ available: false, reason: String(err?.message || err) });
+  }
 });
 
 app.get('/api/dashboard', async (req, res) => {

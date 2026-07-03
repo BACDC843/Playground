@@ -12,6 +12,9 @@ let sp = null; // filtered previous-period state, used for MoM deltas
 
 let charts = {};
 let cinit = {};
+let TREND_DATA = null; // 6-month rollup, cached for the session (doesn't change with date nav)
+let COMMUNITY_DATA = null;
+let COMMUNITY_RANGE_KEY = null; // re-fetch only when the viewed range actually changes
 
 // ── Date helpers ──────────────────────────────────────
 const MOS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -768,6 +771,126 @@ function buildExecutiveSummary(){
   return headline+action;
 }
 
+// ── GROWTH TREND (last 6 months) ──────────────────────
+// Cached for the whole session since it's a fixed "last N months from now"
+// window, independent of whatever period the rest of the dashboard is
+// navigated to -- redrawn (not re-fetched) every time Insights re-renders,
+// since renderInsights() rebuilds the canvas elements from scratch each load.
+async function loadTrend(){
+  const container=document.getElementById('trend-container');
+  if(!container) return;
+  if(TREND_DATA){ renderTrendCharts(); return; }
+  try{
+    const resp=await fetch('/api/trend?months=6');
+    const body=await resp.json().catch(()=>null);
+    if(!resp.ok||!body||!body.trend){
+      container.innerHTML='<div class="nd">Growth trend unavailable'+(body&&body.error?': '+body.error:'')+'.</div>';
+      return;
+    }
+    TREND_DATA=body.trend;
+    renderTrendCharts();
+  }catch(err){
+    container.innerHTML='<div class="nd">Could not load growth trend: '+err.message+'</div>';
+  }
+}
+
+function renderTrendCharts(){
+  if(!TREND_DATA||typeof Chart==='undefined') return;
+  const labels=TREND_DATA.map(m=>m.label);
+  const lineOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:10,padding:8}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:9}},beginAtZero:true}}};
+  dc('c-trend-reach');
+  charts['c-trend-reach']=new Chart(document.getElementById('c-trend-reach'),{type:'line',
+    data:{labels,datasets:[
+      {label:'IG Reach',data:TREND_DATA.map(m=>m.igReach),borderColor:'#833ab4',backgroundColor:'rgba(131,58,180,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3,spanGaps:true},
+      {label:'FB Reach',data:TREND_DATA.map(m=>m.fbReach),borderColor:'#1877F2',backgroundColor:'rgba(24,119,242,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3,spanGaps:true},
+    ]},options:lineOpts});
+  dc('c-trend-eng');
+  charts['c-trend-eng']=new Chart(document.getElementById('c-trend-eng'),{type:'line',
+    data:{labels,datasets:[
+      {label:'IG Accts Engaged',data:TREND_DATA.map(m=>m.igAccsEng),borderColor:'#833ab4',backgroundColor:'rgba(131,58,180,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3,spanGaps:true},
+      {label:'FB Engagements',data:TREND_DATA.map(m=>m.fbEng),borderColor:'#1877F2',backgroundColor:'rgba(24,119,242,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3,spanGaps:true},
+    ]},options:lineOpts});
+  dc('c-trend-followers');
+  charts['c-trend-followers']=new Chart(document.getElementById('c-trend-followers'),{type:'line',
+    data:{labels,datasets:[
+      {label:'IG New Followers',data:TREND_DATA.map(m=>m.igNewFollowers),borderColor:'#4A7C59',borderWidth:2,pointRadius:3,tension:.3,spanGaps:true},
+      {label:'FB New Page Likes',data:TREND_DATA.map(m=>m.fbNewFans),borderColor:'#C99A4A',borderWidth:2,pointRadius:3,tension:.3,spanGaps:true},
+    ]},options:lineOpts});
+}
+
+// ── BENCHMARK SCORECARD ────────────────────────────────
+function renderBenchmarkBar(label,valuePct,lowBench,highBench,note){
+  const maxScale=Math.max(highBench*1.8,valuePct*1.15,1);
+  const bandLeftPct=(lowBench/maxScale)*100;
+  const bandWidthPct=((highBench-lowBench)/maxScale)*100;
+  const fillPct=Math.min(100,(Math.max(valuePct,0)/maxScale)*100);
+  const status=valuePct>=highBench?'good':valuePct>=lowBench?'warn':'bad';
+  const color=status==='good'?'#4A7C59':status==='warn'?'#C99A4A':'#B3362A';
+  const statusLabel=status==='good'?'Above benchmark':status==='warn'?'Within benchmark':'Below benchmark';
+  return `<div style="margin-bottom:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+      <span style="font-size:12.5px;font-weight:600;color:#182433;">${label}</span>
+      <span style="font-size:13px;font-weight:700;color:${color};">${valuePct.toFixed(1)}% <span style="font-size:10px;font-weight:600;">${statusLabel}</span></span>
+    </div>
+    <div style="position:relative;height:22px;background:#EFE9DE;border-radius:11px;overflow:hidden;">
+      <div style="position:absolute;top:0;bottom:0;left:${bandLeftPct}%;width:${bandWidthPct}%;background:rgba(201,154,74,.28);"></div>
+      <div style="position:absolute;top:3px;bottom:3px;left:0;width:${fillPct}%;background:${color};border-radius:8px;"></div>
+    </div>
+    <div style="font-size:10px;color:#6B6F73;margin-top:4px;">Industry benchmark: ${lowBench}–${highBench}%${note?(' · '+note):''}</div>
+  </div>`;
+}
+
+// ── COMMUNITY MANAGEMENT (reply rate) ─────────────────
+// Best-effort: one extra Graph API call per commented-on post to see who
+// wrote each comment. If anything about that fails for this account, the
+// whole section just hides instead of affecting anything else.
+async function loadCommunity(){
+  const container=document.getElementById('community-container');
+  const sec=document.getElementById('community-sec');
+  if(!container||!sec) return;
+  const range=customRange||getRange();
+  const key=range.since+'_'+range.until;
+  if(COMMUNITY_DATA&&COMMUNITY_RANGE_KEY===key){ renderCommunitySection(); return; }
+  try{
+    const url=new URL('/api/community',location.origin);
+    url.searchParams.set('since',range.since);
+    url.searchParams.set('until',range.until);
+    const resp=await fetch(url);
+    const body=await resp.json().catch(()=>null);
+    COMMUNITY_DATA=body;
+    COMMUNITY_RANGE_KEY=key;
+    renderCommunitySection();
+  }catch(err){
+    COMMUNITY_DATA=null;
+    sec.style.display='none';
+    container.innerHTML='';
+  }
+}
+
+function renderCommunitySection(){
+  const container=document.getElementById('community-container');
+  const sec=document.getElementById('community-sec');
+  if(!container||!sec) return;
+  const d=COMMUNITY_DATA;
+  if(!d||!d.available){
+    sec.style.display='none';
+    container.innerHTML='';
+    return;
+  }
+  sec.style.display='';
+  if(d.postsWithComments===0){
+    container.innerHTML='<div class="nd">No comments received this period.</div>';
+    return;
+  }
+  const pct=d.replyRate;
+  const color=pct>=80?'#4A7C59':pct>=40?'#C99A4A':'#B3362A';
+  container.innerHTML=`<div class="kg g3">
+    <div class="kpi"><div class="kl">Reply Rate</div><div class="kv" style="color:${color}">${pct}%</div><div class="ks">of posts with comments got a reply</div></div>
+    <div class="kpi"><div class="kl">Posts With Comments</div><div class="kv">${d.postsWithComments}</div><div class="ks">this period</div></div>
+    <div class="kpi"><div class="kl">Posts You Replied To</div><div class="kv">${d.postsWithReply}</div><div class="ks">at least one reply</div></div>
+  </div>`;
+}
+
 function renderInsights(){
   const ig=igM(),fb=fbM();
   const roi=calcContentROI();
@@ -800,10 +923,25 @@ function renderInsights(){
       (pct>12?'<span style="font-size:10px;color:#fff;font-weight:700;">'+pct+'%</span>':'')+
       '</div></div></div>';
   }).join('');
+  const engRatePct=ig.totalReach>0?(ig.totalEng/ig.totalReach)*100:0;
+  const followRatePct=ig.totalReach>0?(ig.newFol/ig.totalReach)*100:0;
   document.getElementById('tab-insights').innerHTML=
     renderLiveBar()+
+    '<div class="sec">📈 Growth Trend <span class="pill" style="background:#243447;color:#fff;font-size:10px;">Last 6 Months</span></div>'+
+    '<div id="trend-container">'+
+    '<div class="crow c11" style="margin-bottom:12px;">'+
+    '<div class="cc"><div class="ct">Reach</div><div class="cst">Unique accounts/people reached per month</div><div class="cw"><canvas id="c-trend-reach"></canvas></div></div>'+
+    '<div class="cc"><div class="ct">Engagement</div><div class="cst">IG accounts engaged vs FB post engagements per month</div><div class="cw"><canvas id="c-trend-eng"></canvas></div></div>'+
+    '</div>'+
+    '<div class="cc" style="margin-bottom:18px;"><div class="ct">Follower / Page-Like Growth</div><div class="cst">New IG followers vs new FB Page likes per month</div><div class="cw"><canvas id="c-trend-followers"></canvas></div></div>'+
+    '</div>'+
     '<div class="sec">📊 Content Type ROI <span class="pill p-ig">IG</span></div>'+
     '<div class="kg g3">'+(roiCards||'<div class="nd">No posts this period.</div>')+'</div>'+
+    '<div class="sec">🎯 Performance vs. Benchmark</div>'+
+    '<div class="cc" style="margin-bottom:18px;">'+
+    renderBenchmarkBar('IG Engagement Rate',engRatePct,2,4,'luxury home builder average')+
+    renderBenchmarkBar('IG Follow Rate',followRatePct,0.5,1,'reach-to-new-follower conversion')+
+    '</div>'+
     '<div class="sec">🕐 Best Day to Post <span class="pill" style="background:#4E5D73;color:#fff;font-size:10px;">IG + FB combined</span></div>'+
     '<div class="crow c11">'+
     '<div class="cc"><div class="ct">Avg Engagement by Day</div>'+
@@ -816,9 +954,13 @@ function renderInsights(){
     '<div class="cc" style="margin-bottom:16px;"><div class="ct">Reach → Action</div>'+
     '<div class="cst">Where your audience drops off between seeing content and taking action</div>'+
     '<div style="padding:16px 8px;">'+funnelHTML+'</div></div>'+
+    '<div class="sec" id="community-sec" style="display:none;">💬 Community Management</div>'+
+    '<div id="community-container" style="margin-bottom:18px;"></div>'+
     '<div class="sec">🧠 Insights &amp; Recommendations</div>'+
     '<div id="ai-insights-panel" style="background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #E4DCC9;margin-bottom:20px;">'+
     '<div id="ai-insights-content" style="color:#182433;font-size:13px;line-height:1.8;">'+buildRuleInsights()+'</div></div>';
+  loadTrend();
+  loadCommunity();
 }
 
 // ── CHARTS ────────────────────────────────────────────
