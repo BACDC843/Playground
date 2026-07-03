@@ -73,29 +73,37 @@ const MAX_POST_PAGES = 20;
 // guarantee we can fully rely on, so a `since` further back than the most
 // recent 50 posts would otherwise silently disappear. This follows Meta's
 // own pagination (`paging.next`) until it has actually seen a post older
-// than `since`, rather than trusting the since/until params alone to do
-// the filtering. `since`/`until` are still sent as a hint (Meta may use
-// them to pre-filter and shrink the number of pages needed) but if that
-// edge rejects them outright, it retries the first page without them.
-async function fetchPostsInRange(edge, fields, since, until, dateField) {
-  const capped = cappedUntil(until);
+// than `since`, rather than trusting the since param alone to do the
+// filtering. `since` is still sent as a hint (Meta may use it to
+// pre-filter and shrink the number of pages needed) but if that edge
+// rejects it outright, it retries the first page without it.
+//
+// `until` is deliberately never sent here. Meta's `until` cutoff excludes
+// the exact day passed in (it's a start-of-day boundary, not end-of-day),
+// so capping it at "today" was silently telling Meta "before today" and
+// dropping every post published today. Since the frontend already
+// re-filters the returned posts to the exact requested window (including
+// the full end day), the server doesn't need Meta's `until` filtering to
+// be correct at all -- it only needs to know where to stop paging backward,
+// which `since` and the per-page date check below already handle.
+async function fetchPostsInRange(edge, fields, since, dateField) {
   const sinceMs = new Date(`${since}T00:00:00`).getTime();
   const all = [];
   let next = null;
-  let paramsWithoutDates = null; // set only if since/until get rejected
+  let paramsWithoutSince = null; // set only if `since` gets rejected
   for (let page = 0; page < MAX_POST_PAGES; page++) {
     let body;
     if (next) {
       body = await graphFetch(next);
-    } else if (paramsWithoutDates) {
-      body = await graphGet(edge, paramsWithoutDates);
+    } else if (paramsWithoutSince) {
+      body = await graphGet(edge, paramsWithoutSince);
     } else {
       try {
-        body = await graphGet(edge, { fields, since, until: capped, limit: 50 });
+        body = await graphGet(edge, { fields, since, limit: 50 });
       } catch (err) {
-        console.warn(`${edge}: since/until rejected (${err.message}) -- paginating without them instead`);
-        paramsWithoutDates = { fields, limit: 50 };
-        body = await graphGet(edge, paramsWithoutDates);
+        console.warn(`${edge}: since rejected (${err.message}) -- paginating without it instead`);
+        paramsWithoutSince = { fields, limit: 50 };
+        body = await graphGet(edge, paramsWithoutSince);
       }
     }
     const items = body?.data ?? [];
@@ -109,11 +117,11 @@ async function fetchPostsInRange(edge, fields, since, until, dateField) {
 }
 
 async function getIGPosts(since, until) {
-  return fetchPostsInRange(`${META_IG_ID}/media`, IG_POST_FIELDS, since, until, 'timestamp');
+  return fetchPostsInRange(`${META_IG_ID}/media`, IG_POST_FIELDS, since, 'timestamp');
 }
 
 async function getFBPosts(since, until) {
-  return fetchPostsInRange(`${META_FB_PAGE_ID}/posts`, FB_POST_FIELDS, since, until, 'created_time');
+  return fetchPostsInRange(`${META_FB_PAGE_ID}/posts`, FB_POST_FIELDS, since, 'created_time');
 }
 
 // Meta's insights endpoint rejects any since/until span over 30 days, so a
