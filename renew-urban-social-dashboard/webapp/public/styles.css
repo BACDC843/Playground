@@ -60,6 +60,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .kpi.fbhi{border-color:var(--fb)} .kpi.fbhi .kv{color:var(--fb)}
 .kpi.good .kv{color:var(--green)} .kpi.warn .kv{color:var(--amber)} .kpi.bad .kv{color:var(--red)}
 .kl{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.kl-info{display:inline-block;color:#bbb;font-size:11px;cursor:help;font-weight:400;text-transform:none;letter-spacing:0}
+.kl-info:hover{color:var(--gold)}
+
+/* ── EXECUTIVE SUMMARY ── */
+.exec-summary{background:linear-gradient(135deg,#faf8f4,#f3ede2);border:1px solid var(--gold-lt);border-left:4px solid var(--gold);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:13px;line-height:1.65;color:var(--dark)}
 .kv{font-size:25px;font-weight:800;line-height:1}
 .ks{font-size:11px;color:var(--muted);margin-top:3px}
 

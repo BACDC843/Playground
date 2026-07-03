@@ -29,9 +29,16 @@ const IG_METRICS = [
   { name: 'website_clicks', metric_type: 'total_value' },
   { name: 'accounts_engaged', metric_type: 'total_value' },
 ];
+// page_impressions_unique/page_fan_adds added to give FB the same
+// reach/follower-growth story IG already has (Facebook's API supports both;
+// they just weren't being requested). Each metric is independent per the
+// comment above, so if either of these isn't available for a given Page,
+// it drops out gracefully rather than breaking the rest.
 const FB_METRICS = [
   { name: 'page_post_engagements' },
   { name: 'page_views_total' },
+  { name: 'page_impressions_unique' },
+  { name: 'page_fan_adds' },
 ];
 
 const TIMEOUT_MS = 15000;

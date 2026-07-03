@@ -187,15 +187,18 @@ function igM(){
 
 function fbM(){
   const eng=getVals(s.fbIns,'page_post_engagements'), views=getVals(s.fbIns,'page_views_total');
+  const reach=getVals(s.fbIns,'page_impressions_unique'), fanAdds=getVals(s.fbIns,'page_fan_adds');
   return {
     totalEng:eng.reduce((a,v)=>a+(v.value||0),0),
     peakEng:Math.max(0,...eng.map(v=>v.value||0)),
     pageViews:views.reduce((a,v)=>a+(v.value||0),0),
+    totalReach:reach.reduce((a,v)=>a+(v.value||0),0),
+    newFans:fanAdds.reduce((a,v)=>a+(v.value||0),0),
     posts:s.fbPosts.length,
     tl:s.fbPosts.reduce((a,p)=>a+((p.likes&&p.likes.summary&&p.likes.summary.total_count)||0),0),
     tc:s.fbPosts.reduce((a,p)=>a+((p.comments&&p.comments.summary&&p.comments.summary.total_count)||0),0),
     ts:s.fbPosts.reduce((a,p)=>a+((p.shares&&p.shares.count)||0),0),
-    engByDay:eng, viewsByDay:views,
+    engByDay:eng, viewsByDay:views, reachByDay:reach, fanAddsByDay:fanAdds,
   };
 }
 
@@ -228,12 +231,14 @@ function prevM(){
   const igCm=(sp.igPosts||[]).reduce((a,p)=>a+(p.comments_count||0),0);
   const fbEng=gV(sp.fbIns,'page_post_engagements').reduce((a,v)=>a+(v.value||0),0);
   const fbViews=gV(sp.fbIns,'page_views_total').reduce((a,v)=>a+(v.value||0),0);
+  const fbReach=gV(sp.fbIns,'page_impressions_unique').reduce((a,v)=>a+(v.value||0),0);
+  const fbNewFans=gV(sp.fbIns,'page_fan_adds').reduce((a,v)=>a+(v.value||0),0);
   return {
     igReach:igR, igEng:igLk+igCm, igNewFol:igFc,
     igProfViews:gT(sp.igIns,'profile_views'),
     igWebClicks:gT(sp.igIns,'website_clicks'),
     igAccsEng:gT(sp.igIns,'accounts_engaged'),
-    fbEng, fbViews,
+    fbEng, fbViews, fbReach, fbNewFans,
     fbLikes:(sp.fbPosts||[]).reduce((a,p)=>a+((p.likes&&p.likes.summary&&p.likes.summary.total_count)||0),0),
     igPosts:(sp.igPosts||[]).length, fbPosts:(sp.fbPosts||[]).length,
   };
@@ -244,6 +249,21 @@ function momBadge(curr,prev){
   const pct=prev===0?(curr>0?100:0):Math.round(((curr-prev)/Math.abs(prev))*100);
   if(Math.abs(pct)<2) return '<span class="mom mom-flat">→ 0%</span>';
   return pct>0?`<span class="mom mom-up">↑ ${pct}%</span>`:`<span class="mom mom-dn">↓ ${Math.abs(pct)}%</span>`;
+}
+
+// Plain-text version of momBadge for use inside prose (the executive summary),
+// where an HTML pill doesn't fit.
+function momPhrase(curr,prev){
+  if(prev==null||!sp) return '';
+  const pct=prev===0?(curr>0?100:0):Math.round(((curr-prev)/Math.abs(prev))*100);
+  if(Math.abs(pct)<2) return ' (flat vs last period)';
+  return pct>0?` (up ${pct}% vs last period)`:` (down ${Math.abs(pct)}% vs last period)`;
+}
+
+// A KPI tile label with an optional hover tooltip explaining the metric --
+// for numbers that aren't self-explanatory to a non-marketer reading this.
+function klbl(text,tip){
+  return tip?`<div class="kl">${text} <span class="kl-info" title="${tip.replace(/"/g,'&quot;')}">ⓘ</span></div>`:`<div class="kl">${text}</div>`;
 }
 
 // ── Type labels ───────────────────────────────────────
@@ -403,17 +423,18 @@ function renderOV(){
 
   document.getElementById('tab-overview').innerHTML = `
     ${renderLiveBar()}
+    <div class="exec-summary">${buildExecutiveSummary()}</div>
     <div class="sec">🏆 Top Post Spotlight</div>
     ${spotlight||'<div class="nd" style="margin-bottom:18px">No posts found — navigate to a month with content.</div>'}
     <div class="sec" style="margin-top:24px;">📅 Content Calendar <span class="pill" style="background:#4A3728;color:#fff;font-size:10px;">IG + FB</span></div>
     <div class="cal-wrap"><div id="cal-container">${renderPostCalendar()}</div></div>
     <div class="sec">Combined Performance <span class="pill p-live">LIVE</span></div>
     <div class="kg g5">
-      <div class="kpi hi"><div class="kl">IG Reach</div><div class="kv">${ig.totalReach.toLocaleString()}${momBadge(ig.totalReach,pm&&pm.igReach)}</div><div class="ks">unique accounts</div></div>
+      <div class="kpi hi">${klbl('IG Reach','Unique Instagram accounts that saw at least one of your posts this period.')}<div class="kv">${ig.totalReach.toLocaleString()}${momBadge(ig.totalReach,pm&&pm.igReach)}</div><div class="ks">unique accounts</div></div>
       <div class="kpi"><div class="kl">IG Engagements</div><div class="kv">${ig.totalEng.toLocaleString()}${momBadge(ig.totalEng,pm&&pm.igEng)}</div><div class="ks">${ig.tl} likes · ${ig.tc} cmts</div></div>
       <div class="kpi fbhi"><div class="kl">FB Engagements</div><div class="kv">${fb.totalEng.toLocaleString()}${momBadge(fb.totalEng,pm&&pm.fbEng)}</div><div class="ks">likes · cmts · shares</div></div>
       <div class="kpi"><div class="kl">Posts Published</div><div class="kv">${totalPosts}${momBadge(totalPosts,pm?(pm.igPosts||0)+(pm.fbPosts||0):null)}</div><div class="ks">${s.igPosts.length} IG · ${s.fbPosts.length} FB</div></div>
-      <div class="kpi ${ig.webClicks<3?'bad':ig.webClicks<8?'warn':'good'}"><div class="kl">Website Clicks</div><div class="kv">${ig.webClicks}${momBadge(ig.webClicks,pm&&pm.igWebClicks)}</div><div class="ks">${ig.webClicks<3?'⚠ critically low':'from IG bio'}</div></div>
+      <div class="kpi ${ig.webClicks<3?'bad':ig.webClicks<8?'warn':'good'}">${klbl('Website Clicks','Taps on the link in your Instagram bio.')}<div class="kv">${ig.webClicks}${momBadge(ig.webClicks,pm&&pm.igWebClicks)}</div><div class="ks">${ig.webClicks<3?'⚠ critically low':'from IG bio'}</div></div>
     </div>
     <div class="crow c21">
       <div class="cc"><div class="ct">IG Reach vs FB Engagement</div><div class="cst">Daily comparison — dual axis</div><div class="cw"><canvas id="c-combo"></canvas></div></div>
@@ -495,11 +516,11 @@ function renderIG(){
     ${renderLiveBar()}
     <div class="sec">Instagram Performance <span class="pill p-ig">IG</span></div>
     <div class="kg g5">
-      <div class="kpi hi"><div class="kl">Total Reach</div><div class="kv">${ig.totalReach.toLocaleString()}${momBadge(ig.totalReach,pm&&pm.igReach)}</div><div class="ks">unique accounts</div></div>
-      <div class="kpi"><div class="kl">Accts Engaged</div><div class="kv">${ig.accsEng}${momBadge(ig.accsEng,pm&&pm.igAccsEng)}</div><div class="ks">interacted w/ content</div></div>
-      <div class="kpi good"><div class="kl">New Followers</div><div class="kv">${ig.newFol}${momBadge(ig.newFol,pm&&pm.igNewFol)}</div><div class="ks">organic growth</div></div>
-      <div class="kpi"><div class="kl">Profile Views</div><div class="kv">${ig.profViews}${momBadge(ig.profViews,pm&&pm.igProfViews)}</div><div class="ks">bio visits</div></div>
-      <div class="kpi ${ig.webClicks<3?'bad':ig.webClicks<8?'warn':''}"><div class="kl">Website Clicks</div><div class="kv">${ig.webClicks}${momBadge(ig.webClicks,pm&&pm.igWebClicks)}</div><div class="ks">${ig.webClicks<3?'⚠ update bio CTA':'bio link taps'}</div></div>
+      <div class="kpi hi">${klbl('Total Reach','Unique Instagram accounts that saw at least one of your posts this period.')}<div class="kv">${ig.totalReach.toLocaleString()}${momBadge(ig.totalReach,pm&&pm.igReach)}</div><div class="ks">unique accounts</div></div>
+      <div class="kpi">${klbl('Accts Engaged','Accounts that liked, commented on, saved, or shared your content.')}<div class="kv">${ig.accsEng}${momBadge(ig.accsEng,pm&&pm.igAccsEng)}</div><div class="ks">interacted w/ content</div></div>
+      <div class="kpi good">${klbl('New Followers','Net new Instagram followers gained this period.')}<div class="kv">${ig.newFol}${momBadge(ig.newFol,pm&&pm.igNewFol)}</div><div class="ks">organic growth</div></div>
+      <div class="kpi">${klbl('Profile Views','Visits to your Instagram profile page.')}<div class="kv">${ig.profViews}${momBadge(ig.profViews,pm&&pm.igProfViews)}</div><div class="ks">bio visits</div></div>
+      <div class="kpi ${ig.webClicks<3?'bad':ig.webClicks<8?'warn':''}">${klbl('Website Clicks','Taps on the link in your Instagram bio.')}<div class="kv">${ig.webClicks}${momBadge(ig.webClicks,pm&&pm.igWebClicks)}</div><div class="ks">${ig.webClicks<3?'⚠ update bio CTA':'bio link taps'}</div></div>
     </div>
     <div class="crow c11">
       <div class="cc"><div class="ct">Daily Reach</div><div class="cst">Unique accounts reached per day</div><div class="cw"><canvas id="c-ig-reach"></canvas></div></div>
@@ -557,11 +578,16 @@ function renderFB(){
   document.getElementById('tab-fb').innerHTML = `
     ${renderLiveBar()}
     <div class="sec">Facebook Performance <span class="pill p-fb">FB</span></div>
-    <div class="kg g4">
-      <div class="kpi fbhi"><div class="kl">Total Engagements</div><div class="kv">${fb.totalEng.toLocaleString()}${momBadge(fb.totalEng,pm&&pm.fbEng)}</div><div class="ks">likes · cmts · shares</div></div>
-      <div class="kpi"><div class="kl">Page Views</div><div class="kv">${fb.pageViews}${momBadge(fb.pageViews,pm&&pm.fbViews)}</div><div class="ks">total this period</div></div>
+    <div class="kg g5">
+      <div class="kpi fbhi">${klbl('Total Reach','Unique people who saw any of your Facebook Page’s posts.')}<div class="kv">${fb.totalReach.toLocaleString()}${momBadge(fb.totalReach,pm&&pm.fbReach)}</div><div class="ks">unique people</div></div>
+      <div class="kpi fbhi">${klbl('Total Engagements','Likes, comments, and shares across your Facebook posts.')}<div class="kv">${fb.totalEng.toLocaleString()}${momBadge(fb.totalEng,pm&&pm.fbEng)}</div><div class="ks">peak day ${fb.peakEng}</div></div>
+      <div class="kpi good">${klbl('New Page Likes','Net new people who liked/followed your Facebook Page this period.')}<div class="kv">${fb.newFans}${momBadge(fb.newFans,pm&&pm.fbNewFans)}</div><div class="ks">organic growth</div></div>
+      <div class="kpi">${klbl('Page Views','Visits to your Facebook Page.')}<div class="kv">${fb.pageViews}${momBadge(fb.pageViews,pm&&pm.fbViews)}</div><div class="ks">total this period</div></div>
       <div class="kpi"><div class="kl">Posts</div><div class="kv">${fb.posts}${momBadge(fb.posts,pm&&pm.fbPosts)}</div><div class="ks">${fb.tl} likes · ${fb.ts} shares</div></div>
-      <div class="kpi fbhi"><div class="kl">Peak Day</div><div class="kv">${fb.peakEng}</div><div class="ks">single best day</div></div>
+    </div>
+    <div class="crow c11">
+      <div class="cc"><div class="ct">Daily Reach</div><div class="cst">Unique people reached per day</div><div class="cw"><canvas id="c-fb-reach"></canvas></div></div>
+      <div class="cc"><div class="ct">Daily Page Likes</div><div class="cst">New Page likes gained per day</div><div class="cw"><canvas id="c-fb-fans"></canvas></div></div>
     </div>
     <div class="crow c11">
       <div class="cc"><div class="ct">Daily Post Engagements</div><div class="cst">Total engagement actions per day</div><div class="cw"><canvas id="c-fb-eng"></canvas></div></div>
@@ -720,6 +746,33 @@ function renderLiveBar(){
   return '<div class="live-bar" style="display:flex;align-items:center;">✅ '+getPeriod()+' · Refreshed '+refreshed+' · auto-updates every 5 min '+btn+'</div>';
 }
 
+// A 2-3 sentence plain-English readout for the top of the Overview tab --
+// meant to be readable in the time it takes to open the page, before
+// scrolling into any chart. Reuses the same computed metrics as the rest
+// of the tab rather than re-deriving anything.
+function buildExecutiveSummary(){
+  const ig=igM(), fb=fbM(), pm=prevM(), top5=matched().slice(0,5);
+  const period=getPeriod();
+  if(ig.totalReach===0&&fb.totalEng===0&&s.igPosts.length===0&&s.fbPosts.length===0){
+    return `<strong>${period}:</strong> no posts or activity recorded for this period yet.`;
+  }
+  const tp=top5[0];
+  const fbWins=fb.totalEng>ig.totalEng;
+  let headline=`<strong>${period} at a glance:</strong> Instagram reached <strong>${ig.totalReach.toLocaleString()} accounts</strong>${momPhrase(ig.totalReach,pm&&pm.igReach)} with <strong>${ig.totalEng.toLocaleString()} engagements</strong>. `;
+  headline+=fbWins
+    ?`Facebook out-performed IG on engagement this period (<strong>${fb.totalEng.toLocaleString()}</strong> vs ${ig.totalEng.toLocaleString()}). `
+    :`Instagram was the stronger engagement platform this period${fb.totalEng>0?` (FB: ${fb.totalEng.toLocaleString()})`:''}. `;
+  let action;
+  if(ig.webClicks<3&&ig.profViews>0){
+    action=`<strong>Priority:</strong> website clicks are critically low (${ig.webClicks} from ${ig.profViews} profile views) — update the IG bio link CTA this week.`;
+  } else if(tp){
+    action=`<strong>Top performer:</strong> "${(tp.ig.caption||'').substring(0,50).replace(/\n/g,' ')}…" earned ${tp.score} combined engagements — see what made it work below.`;
+  } else {
+    action=`Keep posting consistently to start building a performance trend here.`;
+  }
+  return headline+action;
+}
+
 function renderInsights(){
   const ig=igM(),fb=fbM();
   const roi=calcContentROI();
@@ -867,6 +920,22 @@ function initCharts(t){
     }
   }
   if(t==='fb'){
+    dc('c-fb-reach');
+    if(fb.reachByDay.length){
+      charts['c-fb-reach']=new Chart(document.getElementById('c-fb-reach'),{
+        type:'bar',
+        data:{labels:chartLabels(fb.reachByDay),datasets:[{data:fb.reachByDay.map(v=>v.value),backgroundColor:fb.reachByDay.map(v=>(v.value||0)>=100?'#1877F2':'#93B5F5'),borderRadius:3}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10}}}}}
+      });
+    }
+    dc('c-fb-fans');
+    if(fb.fanAddsByDay.length){
+      charts['c-fb-fans']=new Chart(document.getElementById('c-fb-fans'),{
+        type:'bar',
+        data:{labels:chartLabels(fb.fanAddsByDay),datasets:[{data:fb.fanAddsByDay.map(v=>v.value),backgroundColor:'#4A7C59',borderRadius:3}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10},stepSize:1},min:0}}}
+      });
+    }
     dc('c-fb-eng');
     if(fb.engByDay.length){
       charts['c-fb-eng']=new Chart(document.getElementById('c-fb-eng'),{
