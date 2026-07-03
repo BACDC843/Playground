@@ -95,7 +95,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cal-thumb{width:30px;height:30px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:opacity .15s,transform .15s;}
 .cal-thumb.ig{border-color:#833ab4;}
 .cal-thumb.fb{border-color:#1877F2;}
-.cal-thumb-wrap{position:relative;width:32px;height:32px;border-radius:4px;overflow:visible;cursor:pointer;flex-shrink:0;}
+.cal-thumb-wrap{display:block;position:relative;width:32px;height:32px;border-radius:4px;overflow:visible;cursor:pointer;flex-shrink:0;}
 .cal-thumb-wrap img,.cal-thumb-wrap .cal-ph{width:32px;height:32px;border-radius:4px;overflow:hidden;border:1.5px solid #ddd;}
 .cal-thumb-wrap:hover img,.cal-thumb-wrap:hover .cal-ph{opacity:.8;}
 .cal-plat{position:absolute;bottom:-4px;right:-4px;font-size:7px;font-weight:800;padding:1px 3px;border-radius:3px;line-height:1.4;pointer-events:none;}

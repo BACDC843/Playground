@@ -319,7 +319,7 @@ function renderPostCalendar(){
       const isToday=ds===todayStr;
       let thumbs='';
       posts.slice(0,4).forEach(p=>{
-        const safeUrl=(p.url||'').replace(/'/g,'%27');
+        const safeUrl=(p.url||'#').replace(/"/g,'&quot;');
         const platIcon=p.platform==='ig'?'<span class="cal-plat ig-plat">IG</span>':'<span class="cal-plat fb-plat">FB</span>';
         let inner;
         if(p.thumb){
@@ -328,7 +328,12 @@ function renderPostCalendar(){
         } else {
           inner=`<div class="cal-ph">${p.platform==='ig'?'📷':'👍'}</div>`;
         }
-        thumbs+=`<div class="cal-thumb-wrap" onclick="event.stopPropagation();window.open('${safeUrl}','_blank')" title="${p.title.replace(/"/g,'&quot;')}">${inner}${platIcon}</div>`;
+        // A real <a href target="_blank"> here, not a JS window.open() --
+        // Facebook/Instagram appear to treat JS-triggered popup navigation
+        // as suspicious and show a "log in to see this" wall, while a
+        // genuine link click (as used everywhere else in this dashboard)
+        // goes through fine.
+        thumbs+=`<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="cal-thumb-wrap" onclick="event.stopPropagation()" title="${p.title.replace(/"/g,'&quot;')}">${inner}${platIcon}</a>`;
       });
       if(posts.length>4) thumbs+='<div class="cal-more">+'+(posts.length-4)+'</div>';
       let titleRow='';
