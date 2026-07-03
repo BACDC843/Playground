@@ -36,9 +36,25 @@ webapp/
     .env.example    Copy to .env and fill in your token (never commit .env)
   public/
     index.html      Page markup
-    styles.css      All styling (unchanged from the artifact version)
+    styles.css      All styling -- colors/fonts pulled from DESIGN-SYSTEM.md
     app.js          Dashboard logic: tabs, calendar, charts, KPIs, insights
+  DESIGN-SYSTEM.md  Renew Urban's brand/design system doc (colors, type, etc.)
 ```
+
+## Brand styling
+
+`styles.css`'s `:root` block maps directly onto `DESIGN-SYSTEM.md`'s tokens:
+navy (`--dark`) for the header and dark surfaces, gold (`--gold`/`--gold-lt`)
+for accents/borders/active states, warm white/stone (`--bg`/`--border`) for
+the page background and card borders, and the serif/sans pairing
+(`--serif`/`--sans`) -- serif on the logo, big KPI numbers, the spotlight
+quote, and the executive summary; sans everywhere else, since a dense data
+dashboard needs to stay a "utility" surface per the design system's own
+distinction between hero/editorial and body/utility type. Facebook blue and
+Instagram's gradient are kept as-is on their platform-specific badges/pills
+since those are functional (telling IG data from FB data at a glance), not
+decorative. If the brand system changes, update `DESIGN-SYSTEM.md` and
+re-map the `:root` tokens in `styles.css` from it.
 
 The server never sends your access token to the browser. The frontend only
 ever calls its own `/api/dashboard` endpoint; the server does the Meta Graph

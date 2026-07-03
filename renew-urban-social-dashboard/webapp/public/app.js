@@ -376,7 +376,7 @@ function renderPostCalendar(){
     return nav+'<div class="cal-grid">'+hdr+cells+'</div>';
   }catch(e){
     console.error('renderPostCalendar error:',e);
-    return '<div class="nd" style="padding:16px;color:#c0392b;">Calendar error: '+e.message+'</div>';
+    return '<div class="nd" style="padding:16px;color:#B3362A;">Calendar error: '+e.message+'</div>';
   }
 }
 
@@ -425,7 +425,7 @@ function renderOV(){
     <div class="exec-summary">${buildExecutiveSummary()}</div>
     <div class="sec">🏆 Top Post Spotlight</div>
     ${spotlight||'<div class="nd" style="margin-bottom:18px">No posts found — navigate to a month with content.</div>'}
-    <div class="sec" style="margin-top:24px;">📅 Content Calendar <span class="pill" style="background:#4A3728;color:#fff;font-size:10px;">IG + FB</span></div>
+    <div class="sec" style="margin-top:24px;">📅 Content Calendar <span class="pill" style="background:#182433;color:#fff;font-size:10px;">IG + FB</span></div>
     <div class="cal-wrap"><div id="cal-container">${renderPostCalendar()}</div></div>
     <div class="sec">Combined Performance <span class="pill p-live">LIVE</span></div>
     <div class="kg g5">
@@ -543,7 +543,7 @@ function renderIGTopPerformers(){
   return '<div class="sec">🏆 Top Performers <span class="pill p-ig">IG</span></div>'+
     tpSet(weekTop,'📅 This Week')+
     tpSet(monthTop,'📆 This Month')+
-    '<details style="margin-top:12px;"><summary style="font-size:12px;color:#888;cursor:pointer;user-select:none;">▾ All Posts This Period ('+s.igPosts.length+')</summary>'+
+    '<details style="margin-top:12px;"><summary style="font-size:12px;color:#6B6F73;cursor:pointer;user-select:none;">▾ All Posts This Period ('+s.igPosts.length+')</summary>'+
     '<div class="pgrid" style="margin-top:8px;">'+allGrid+'</div></details>';
 }
 function renderIGPost(p, rank){
@@ -606,7 +606,7 @@ function renderFBTopPerformers(){
   return '<div class="sec">🏆 Top Performers <span class="pill p-fb">FB</span></div>'+
     tpSet(weekTop,'📅 This Week')+
     tpSet(monthTop,'📆 This Month')+
-    '<details style="margin-top:12px;"><summary style="font-size:12px;color:#888;cursor:pointer;user-select:none;">▾ All Posts This Period ('+s.fbPosts.length+')</summary>'+
+    '<details style="margin-top:12px;"><summary style="font-size:12px;color:#6B6F73;cursor:pointer;user-select:none;">▾ All Posts This Period ('+s.fbPosts.length+')</summary>'+
     '<div class="pgrid" style="margin-top:8px;">'+allGrid+'</div></details>';
 }
 function renderFBPost(p, rank){
@@ -732,12 +732,12 @@ function buildRuleInsights(){
   insights.push('<li>'+s5+'</li>');
 
   return '<ul style="margin:0;padding-left:20px;line-height:1.9;">'+insights.join('')+'</ul>'
-    +'<p style="font-size:10px;color:#aaa;margin-top:12px;border-top:1px solid #f0ece6;padding-top:8px;">Computed from live data &middot; '+getPeriod()+'</p>';
+    +'<p style="font-size:10px;color:#928C7E;margin-top:12px;border-top:1px solid #EFE9DE;padding-top:8px;">Computed from live data &middot; '+getPeriod()+'</p>';
 }
 
 function renderLiveBar(){
   const refreshed=DATA.refreshedAt?fmtRefreshDate(DATA.refreshedAt):'—';
-  const btn='<button onclick="loadData()" style="margin-left:auto;background:#155724;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Reload</button>';
+  const btn='<button onclick="loadData()" style="margin-left:auto;background:#0B1F2E;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">🔄 Reload</button>';
   return '<div class="live-bar" style="display:flex;align-items:center;">✅ '+getPeriod()+' · Refreshed '+refreshed+' · auto-updates every 5 min '+btn+'</div>';
 }
 
@@ -773,29 +773,29 @@ function renderInsights(){
   const roi=calcContentROI();
   const maxROI=Math.max(1,...roi.map(r=>r.avgEng));
   const funnelSteps=[
-    {label:'Reach',value:ig.totalReach,color:'#B09B72',icon:'👁'},
-    {label:'Accts Engaged',value:ig.accsEng,color:'#4A6C8A',icon:'💬'},
+    {label:'Reach',value:ig.totalReach,color:'#C99A4A',icon:'👁'},
+    {label:'Accts Engaged',value:ig.accsEng,color:'#4E5D73',icon:'💬'},
     {label:'Profile Views',value:ig.profViews,color:'#4A7C59',icon:'👤'},
     {label:'Website Clicks',value:ig.webClicks,color:'#833ab4',icon:'🔗'}
   ];
   const maxF=Math.max(1,funnelSteps[0].value);
   const roiCards=roi.map(r=>{
     return '<div class="kpi"><div class="kl">'+r.emoji+' '+r.label+'</div>'+
-      '<div class="kv">'+r.avgEng+'<span style="font-size:14px;color:#888;font-weight:400"> avg eng</span></div>'+
+      '<div class="kv">'+r.avgEng+'<span style="font-size:14px;color:#6B6F73;font-weight:400"> avg eng</span></div>'+
       '<div class="ks">'+r.count+' post'+(r.count!==1?'s':'')+' &middot; '+r.totalEng+' total</div>'+
-      '<div style="height:4px;background:#f0ece6;border-radius:2px;margin-top:10px;">'+
-      '<div style="height:100%;width:'+Math.round(r.avgEng/maxROI*100)+'%;background:#B09B72;border-radius:2px;"></div></div></div>';
+      '<div style="height:4px;background:#EFE9DE;border-radius:2px;margin-top:10px;">'+
+      '<div style="height:100%;width:'+Math.round(r.avgEng/maxROI*100)+'%;background:#C99A4A;border-radius:2px;"></div></div></div>';
   }).join('');
   const funnelHTML=funnelSteps.map((step,i)=>{
     const pct=Math.round(step.value/maxF*100);
     const drop=i>0&&funnelSteps[i-1].value>0?Math.round((1-step.value/funnelSteps[i-1].value)*100):null;
     return '<div style="margin-bottom:14px;">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">'+
-      '<span style="font-size:12px;font-weight:600;color:#4A3728;">'+step.icon+' '+step.label+'</span>'+
+      '<span style="font-size:12px;font-weight:600;color:#182433;">'+step.icon+' '+step.label+'</span>'+
       '<span style="font-size:14px;font-weight:700;color:'+step.color+';">'+step.value.toLocaleString()+
       (drop!==null?' <span style="font-size:10px;color:#e74c3c;font-weight:400;">&darr;'+drop+'% drop</span>':'')+
       '</span></div>'+
-      '<div style="height:30px;background:#f0ece6;border-radius:6px;overflow:hidden;">'+
+      '<div style="height:30px;background:#EFE9DE;border-radius:6px;overflow:hidden;">'+
       '<div style="height:100%;width:'+pct+'%;background:'+step.color+';border-radius:6px;display:flex;align-items:center;padding-left:10px;">'+
       (pct>12?'<span style="font-size:10px;color:#fff;font-weight:700;">'+pct+'%</span>':'')+
       '</div></div></div>';
@@ -804,7 +804,7 @@ function renderInsights(){
     renderLiveBar()+
     '<div class="sec">📊 Content Type ROI <span class="pill p-ig">IG</span></div>'+
     '<div class="kg g3">'+(roiCards||'<div class="nd">No posts this period.</div>')+'</div>'+
-    '<div class="sec">🕐 Best Day to Post <span class="pill" style="background:#6c757d;color:#fff;font-size:10px;">IG + FB combined</span></div>'+
+    '<div class="sec">🕐 Best Day to Post <span class="pill" style="background:#4E5D73;color:#fff;font-size:10px;">IG + FB combined</span></div>'+
     '<div class="crow c11">'+
     '<div class="cc"><div class="ct">Avg Engagement by Day</div>'+
     '<div class="cst">Which days earn the most engagement on average</div>'+
@@ -817,8 +817,8 @@ function renderInsights(){
     '<div class="cst">Where your audience drops off between seeing content and taking action</div>'+
     '<div style="padding:16px 8px;">'+funnelHTML+'</div></div>'+
     '<div class="sec">🧠 Insights &amp; Recommendations</div>'+
-    '<div id="ai-insights-panel" style="background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #E8DFD0;margin-bottom:20px;">'+
-    '<div id="ai-insights-content" style="color:#555;font-size:13px;line-height:1.8;">'+buildRuleInsights()+'</div></div>';
+    '<div id="ai-insights-panel" style="background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #E4DCC9;margin-bottom:20px;">'+
+    '<div id="ai-insights-content" style="color:#182433;font-size:13px;line-height:1.8;">'+buildRuleInsights()+'</div></div>';
 }
 
 // ── CHARTS ────────────────────────────────────────────
@@ -848,7 +848,7 @@ function initCharts(t){
           plugins:{legend:{position:'top',labels:{font:{size:11},padding:10}}},
           scales:{
             x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},
-            y:{grid:{color:'#f0ece6'},ticks:{font:{size:9}},position:'left',title:{display:true,text:'IG Reach',color:'#833ab4',font:{size:9}}},
+            y:{grid:{color:'#EFE9DE'},ticks:{font:{size:9}},position:'left',title:{display:true,text:'IG Reach',color:'#833ab4',font:{size:9}}},
             y2:{grid:{display:false},ticks:{font:{size:9}},position:'right',title:{display:true,text:'FB Eng.',color:'#1877F2',font:{size:9}}}
           }}
       });
@@ -860,7 +860,7 @@ function initCharts(t){
     if(vc+cc+ic>0){
       charts['c-mix']=new Chart(document.getElementById('c-mix'),{
         type:'doughnut',
-        data:{labels:['Carousel','Reel/Video','Image'],datasets:[{data:[cc,vc,ic],backgroundColor:['#B09B72','#4A6C8A','#9E9588'],borderWidth:0}]},
+        data:{labels:['Carousel','Reel/Video','Image'],datasets:[{data:[cc,vc,ic],backgroundColor:['#C99A4A','#4E5D73','#8B93A0'],borderWidth:0}]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}},cutout:'62%'}
       });
     }
@@ -871,8 +871,8 @@ function initCharts(t){
     if(ig.reachByDay.length){
       charts['c-ig-reach']=new Chart(document.getElementById('c-ig-reach'),{
         type:'bar',
-        data:{labels:chartLabels(ig.reachByDay),datasets:[{data:ig.reachByDay.map(v=>v.value),backgroundColor:ig.reachByDay.map(v=>(v.value||0)>=100?'#B09B72':'#D4C4A0'),borderRadius:3}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10}}}}}
+        data:{labels:chartLabels(ig.reachByDay),datasets:[{data:ig.reachByDay.map(v=>v.value),backgroundColor:ig.reachByDay.map(v=>(v.value||0)>=100?'#C99A4A':'#D8B36C'),borderRadius:3}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:10}}}}}
       });
     }
     dc('c-ig-fc');
@@ -880,7 +880,7 @@ function initCharts(t){
       charts['c-ig-fc']=new Chart(document.getElementById('c-ig-fc'),{
         type:'bar',
         data:{labels:chartLabels(ig.folByDay),datasets:[{data:ig.folByDay.map(v=>v.value),backgroundColor:'#4A7C59',borderRadius:3}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10},stepSize:1},min:0}}}
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:10},stepSize:1},min:0}}}
       });
     }
   }
@@ -894,11 +894,11 @@ function initCharts(t){
         type:'bar',
         data:{labels:times.byDay.map(d=>d.name),datasets:[{
           data:times.byDay.map(d=>d.avgEng),
-          backgroundColor:times.byDay.map(d=>d.avgEng===maxEng&&d.avgEng>0?'#B09B72':'#D4C4A0'),
+          backgroundColor:times.byDay.map(d=>d.avgEng===maxEng&&d.avgEng>0?'#C99A4A':'#D8B36C'),
           borderRadius:4
         }]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-          scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:9}},beginAtZero:true}}}
+          scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:9}},beginAtZero:true}}}
       });
     }
     dc('c-post-vol');
@@ -907,10 +907,10 @@ function initCharts(t){
         type:'bar',
         data:{labels:times.byDay.map(d=>d.name),datasets:[{
           data:times.byDay.map(d=>d.count),
-          backgroundColor:'#D4C4A0',borderRadius:4
+          backgroundColor:'#D8B36C',borderRadius:4
         }]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-          scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:9},stepSize:1},beginAtZero:true}}}
+          scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:9},stepSize:1},beginAtZero:true}}}
       });
     }
   }
@@ -920,7 +920,7 @@ function initCharts(t){
       charts['c-fb-eng']=new Chart(document.getElementById('c-fb-eng'),{
         type:'bar',
         data:{labels:chartLabels(fb.engByDay),datasets:[{data:fb.engByDay.map(v=>v.value),backgroundColor:fb.engByDay.map(v=>(v.value||0)>=50?'#1877F2':'#93B5F5'),borderRadius:3}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10}}}}}
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:10}}}}}
       });
     }
     dc('c-fb-views');
@@ -928,7 +928,7 @@ function initCharts(t){
       charts['c-fb-views']=new Chart(document.getElementById('c-fb-views'),{
         type:'line',
         data:{labels:chartLabels(fb.viewsByDay),datasets:[{data:fb.viewsByDay.map(v=>v.value),borderColor:'#1877F2',backgroundColor:'rgba(24,119,242,.1)',borderWidth:2,pointRadius:2,fill:true,tension:.3}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10}}}}}
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:10}}}}}
       });
     }
   }
