@@ -314,6 +314,31 @@ app.get('/api/trend', async (req, res) => {
   }
 });
 
+// Trailing-12-months post list for the Content Calendar widget, deliberately
+// independent of whatever date range the rest of the dashboard is navigated
+// to (the header's Month/Week/custom picker) -- same "fixed window, fetched
+// once per session" pattern as /api/trend. Posts only (no insights), since
+// the calendar just needs to know what published on which day.
+app.get('/api/calendar', async (req, res) => {
+  if (!META_ACCESS_TOKEN) {
+    res.status(503).json({ error: 'META_ACCESS_TOKEN is not configured on the server (see server/.env.example)' });
+    return;
+  }
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  const since = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
+  const [igPosts, fbPosts] = await Promise.allSettled([getIGPosts(since), getFBPosts(since)]);
+  res.json({
+    since,
+    igPosts: igPosts.status === 'fulfilled' ? igPosts.value : [],
+    fbPosts: fbPosts.status === 'fulfilled' ? fbPosts.value : [],
+    errors: {
+      igPosts: igPosts.status === 'rejected' ? String(igPosts.reason?.message || igPosts.reason) : null,
+      fbPosts: fbPosts.status === 'rejected' ? String(fbPosts.reason?.message || fbPosts.reason) : null,
+    },
+  });
+});
+
 // Best-effort "did the business reply to comments" rollup for one period.
 // Unlike the main posts/insights fetches, this makes one extra Graph API
 // call per post (to see who commented), so it's kept separate and

@@ -19,6 +19,7 @@ let charts = {};
 let cinit = {};
 let TREND_DATA = null; // 6-month rollup, cached for the session (doesn't change with date nav)
 let COMMUNITY_DATA = null;
+let CALENDAR_DATA = null; // trailing-12-months posts for the Content Calendar, independent of the header's date range
 let COMMUNITY_RANGE_KEY = null; // re-fetch only when the viewed range actually changes
 
 // ── Date helpers ──────────────────────────────────────
@@ -296,8 +297,31 @@ function dc(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 function renderAll(){ renderOV(); renderIG(); renderFB(); renderInsights(); }
 
 // ── CALENDAR NAV ──────────────────────────────────────
+// The calendar tracks its current position by month *key* (e.g. '2026-06'),
+// not array index. It has to: CALENDAR_DATA and UPCOMING_DATA each arrive
+// asynchronously after the first paint and can insert months earlier in the
+// sorted list (an older CALENDAR_DATA month, once it loads, shifts every
+// later index down). An index captured before that data arrived would then
+// silently point at the wrong month. A key is stable regardless of what
+// else gets added to the list around it.
+function calendarMonthKeys(){
+  const calSrc=CALENDAR_DATA||s;
+  const dates=[];
+  (calSrc.igPosts||[]).forEach(p=>{ const d=new Date(p.timestamp); if(!isNaN(d.getTime())) dates.push(d); });
+  (calSrc.fbPosts||[]).forEach(p=>{ const d=new Date(p.created_time); if(!isNaN(d.getTime())) dates.push(d); });
+  if(UPCOMING_DATA&&UPCOMING_DATA.available&&UPCOMING_DATA.upcoming){
+    UPCOMING_DATA.upcoming.forEach(p=>{ const d=new Date(p.scheduleDate); if(!isNaN(d.getTime())) dates.push(d); });
+  }
+  const keys=new Set();
+  dates.forEach(d=>keys.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0')));
+  return Array.from(keys).sort();
+}
 function calNav(dir){
-  window._calMonthIdx=(window._calMonthIdx||0)+dir;
+  const monthKeys=calendarMonthKeys();
+  const curIdx=window._calMonthKey?monthKeys.indexOf(window._calMonthKey):-1;
+  const baseIdx=curIdx>=0?curIdx:monthKeys.length-1;
+  const newIdx=Math.max(0,Math.min(monthKeys.length-1,baseIdx+dir));
+  window._calMonthKey=monthKeys[newIdx];
   const c=document.getElementById('cal-container');
   if(c) c.innerHTML=renderPostCalendar();
 }
@@ -307,14 +331,21 @@ function renderPostCalendar(){
   try{
     const MONTH_NAMES=MOS, DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const allPosts=[];
-    (s.igPosts||[]).forEach(p=>{
+    // Sourced from CALENDAR_DATA (a fixed trailing-12-months fetch), not the
+    // header's currently-selected date range -- the calendar should always
+    // be able to browse a full year regardless of what Month/Week/custom
+    // range the rest of the dashboard is showing. Falls back to whatever's
+    // in `s` before CALENDAR_DATA has loaded so the calendar isn't blank on
+    // first paint.
+    const calSrc=CALENDAR_DATA||s;
+    (calSrc.igPosts||[]).forEach(p=>{
       const d=new Date(p.timestamp);
       if(isNaN(d.getTime())) return;
       allPosts.push({date:d,ds:d.toISOString().split('T')[0],platform:'ig',
         thumb:p.thumbnail_url||p.media_url||null,url:p.permalink||'',
         title:(p.caption||'').replace(/[\n\r]/g,' ').substring(0,45)||'IG Post'});
     });
-    (s.fbPosts||[]).forEach(p=>{
+    (calSrc.fbPosts||[]).forEach(p=>{
       const d=new Date(p.created_time);
       if(isNaN(d.getTime())) return;
       allPosts.push({date:d,ds:d.toISOString().split('T')[0],platform:'fb',
@@ -337,7 +368,7 @@ function renderPostCalendar(){
         if(p.facebook) allPosts.push({date:d,ds,platform:'fb',thumb:p.mediaUrl||null,url:'',title,upcoming:true});
       });
     }
-    if(!allPosts.length) return '<div class="nd" style="padding:16px;">No posts this period.</div>';
+    if(!allPosts.length) return '<div class="nd" style="padding:16px;">No posts in the last 12 months.</div>';
     const byDate={};
     allPosts.forEach(p=>{ if(!byDate[p.ds]) byDate[p.ds]=[]; byDate[p.ds].push(p); });
     const months={};
@@ -347,17 +378,16 @@ function renderPostCalendar(){
       if(!months[key]) months[key]={year:d.getFullYear(),month:d.getMonth()};
     });
     const monthKeys=Object.keys(months).sort();
-    if(!monthKeys.length) return '<div class="nd" style="padding:16px;">No posts this period.</div>';
-    if(window._calMonthIdx===undefined||window._calMonthIdx<0||window._calMonthIdx>=monthKeys.length){
+    if(!monthKeys.length) return '<div class="nd" style="padding:16px;">No posts in the last 12 months.</div>';
+    if(!window._calMonthKey||!monthKeys.includes(window._calMonthKey)){
       // Default to the current calendar month if it's in range (so adding
       // future "upcoming" months doesn't change what opens by default),
       // otherwise fall back to the most recent month with content.
       const now=new Date();
       const todayKey=now.getFullYear()+'-'+String(now.getMonth()).padStart(2,'0');
-      const todayIdx=monthKeys.indexOf(todayKey);
-      window._calMonthIdx=todayIdx>=0?todayIdx:monthKeys.length-1;
+      window._calMonthKey=monthKeys.includes(todayKey)?todayKey:monthKeys[monthKeys.length-1];
     }
-    const mk=monthKeys[window._calMonthIdx];
+    const mk=window._calMonthKey;
     const m=months[mk], year=m.year, month=m.month;
     const firstDow=new Date(year,month,1).getDay();
     const totalDays=new Date(year,month+1,0).getDate();
@@ -409,8 +439,9 @@ function renderPostCalendar(){
         titleRow+'</div>';
     }
     const hdr=DAY_NAMES.map(d=>'<div class="cal-dh">'+d+'</div>').join('');
-    const canPrev=window._calMonthIdx>0;
-    const canNext=window._calMonthIdx<monthKeys.length-1;
+    const curIdx=monthKeys.indexOf(mk);
+    const canPrev=curIdx>0;
+    const canNext=curIdx<monthKeys.length-1;
     const prevBtn=canPrev?'<button class="cal-nav-btn" onclick="calNav(-1)">&#8249;</button>':'<button class="cal-nav-btn" disabled>&#8249;</button>';
     const nextBtn=canNext?'<button class="cal-nav-btn" onclick="calNav(1)">&#8250;</button>':'<button class="cal-nav-btn" disabled>&#8250;</button>';
     const nav='<div class="cal-nav">'+prevBtn+'<span class="cal-nav-label">'+MONTH_NAMES[month]+' '+year+'</span>'+nextBtn+'</div>';
@@ -491,6 +522,7 @@ function renderOV(){
     <div class="twg">${renderTW(ig,fb,{reachEff,ctr,vAvg,cAvg,top5}).join('')}</div>
   `;
   loadUpcoming();
+  loadCalendar();
 }
 
 function renderT5(p, i){
@@ -930,6 +962,26 @@ function renderCommunitySection(){
     <div class="kpi"><div class="kl">Posts With Comments</div><div class="kv">${d.postsWithComments}</div><div class="ks">this period</div></div>
     <div class="kpi"><div class="kl">Posts You Replied To</div><div class="kv">${d.postsWithReply}</div><div class="ks">at least one reply</div></div>
   </div>`;
+}
+
+// ── CONTENT CALENDAR (trailing 12 months, independent of header range) ──
+// Fetched once per session, same pattern as the growth trend -- the
+// calendar widget should let you browse a full year of history regardless
+// of whatever Month/Week/custom range is currently selected up top.
+async function loadCalendar(){
+  const calContainer=document.getElementById('cal-container');
+  if(!calContainer) return;
+  if(CALENDAR_DATA) return; // already fetched this session; renderPostCalendar() already used it
+  try{
+    const resp=await fetch('/api/calendar');
+    const body=await resp.json().catch(()=>null);
+    if(!resp.ok||!body) return; // leave the range-based fallback in place
+    CALENDAR_DATA={igPosts:body.igPosts||[],fbPosts:body.fbPosts||[]};
+    calContainer.innerHTML=renderPostCalendar();
+  }catch(err){
+    // leave the range-based fallback rendered; calendar just won't cover
+    // the full 12 months this session
+  }
 }
 
 // ── UPCOMING POSTS (from GHL Social Planner) ──────────
