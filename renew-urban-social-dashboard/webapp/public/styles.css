@@ -83,10 +83,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cal-wrap{margin-bottom:4px;}
 .cal-month{margin-bottom:20px;}
 .cal-mname{font-size:13px;font-weight:700;color:#4A3728;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #E8DFD0;}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;}
 .cal-dh{text-align:center;font-size:9px;font-weight:700;color:#aaa;padding:4px 0 6px;text-transform:uppercase;letter-spacing:.5px;}
-.cal-empty{min-height:54px;}
-.cal-day{background:#faf9f7;border-radius:6px;min-height:54px;padding:4px 3px;position:relative;}
+.cal-empty{min-height:54px;min-width:0;}
+.cal-day{background:#faf9f7;border-radius:6px;min-height:54px;min-width:0;padding:4px 3px;position:relative;overflow:hidden;}
 .cal-day.has-post{background:#fff;border:1px solid #E8DFD0;box-shadow:0 1px 3px rgba(0,0,0,.04);}
 .cal-day.cal-today .cal-dn{background:#B09B72;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
 .cal-dn{font-size:10px;color:#ccc;font-weight:600;margin-bottom:3px;line-height:1;}
