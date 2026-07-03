@@ -37,8 +37,8 @@ const IG_METRICS = [
 const FB_METRICS = [
   { name: 'page_post_engagements' },
   { name: 'page_views_total' },
-  { name: 'page_impressions_unique' },
-  { name: 'page_fan_adds' },
+  { name: 'page_impressions_unique', metric_type: 'total_value' },
+  { name: 'page_fan_adds', metric_type: 'total_value' },
 ];
 
 const TIMEOUT_MS = 15000;

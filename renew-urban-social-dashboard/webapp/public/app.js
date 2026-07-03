@@ -187,18 +187,17 @@ function igM(){
 
 function fbM(){
   const eng=getVals(s.fbIns,'page_post_engagements'), views=getVals(s.fbIns,'page_views_total');
-  const reach=getVals(s.fbIns,'page_impressions_unique'), fanAdds=getVals(s.fbIns,'page_fan_adds');
   return {
     totalEng:eng.reduce((a,v)=>a+(v.value||0),0),
     peakEng:Math.max(0,...eng.map(v=>v.value||0)),
     pageViews:views.reduce((a,v)=>a+(v.value||0),0),
-    totalReach:reach.reduce((a,v)=>a+(v.value||0),0),
-    newFans:fanAdds.reduce((a,v)=>a+(v.value||0),0),
+    totalReach:getTotal(s.fbIns,'page_impressions_unique'),
+    newFans:getTotal(s.fbIns,'page_fan_adds'),
     posts:s.fbPosts.length,
     tl:s.fbPosts.reduce((a,p)=>a+((p.likes&&p.likes.summary&&p.likes.summary.total_count)||0),0),
     tc:s.fbPosts.reduce((a,p)=>a+((p.comments&&p.comments.summary&&p.comments.summary.total_count)||0),0),
     ts:s.fbPosts.reduce((a,p)=>a+((p.shares&&p.shares.count)||0),0),
-    engByDay:eng, viewsByDay:views, reachByDay:reach, fanAddsByDay:fanAdds,
+    engByDay:eng, viewsByDay:views,
   };
 }
 
@@ -231,8 +230,8 @@ function prevM(){
   const igCm=(sp.igPosts||[]).reduce((a,p)=>a+(p.comments_count||0),0);
   const fbEng=gV(sp.fbIns,'page_post_engagements').reduce((a,v)=>a+(v.value||0),0);
   const fbViews=gV(sp.fbIns,'page_views_total').reduce((a,v)=>a+(v.value||0),0);
-  const fbReach=gV(sp.fbIns,'page_impressions_unique').reduce((a,v)=>a+(v.value||0),0);
-  const fbNewFans=gV(sp.fbIns,'page_fan_adds').reduce((a,v)=>a+(v.value||0),0);
+  const fbReach=gT(sp.fbIns,'page_impressions_unique');
+  const fbNewFans=gT(sp.fbIns,'page_fan_adds');
   return {
     igReach:igR, igEng:igLk+igCm, igNewFol:igFc,
     igProfViews:gT(sp.igIns,'profile_views'),
@@ -586,10 +585,6 @@ function renderFB(){
       <div class="kpi"><div class="kl">Posts</div><div class="kv">${fb.posts}${momBadge(fb.posts,pm&&pm.fbPosts)}</div><div class="ks">${fb.tl} likes · ${fb.ts} shares</div></div>
     </div>
     <div class="crow c11">
-      <div class="cc"><div class="ct">Daily Reach</div><div class="cst">Unique people reached per day</div><div class="cw"><canvas id="c-fb-reach"></canvas></div></div>
-      <div class="cc"><div class="ct">Daily Page Likes</div><div class="cst">New Page likes gained per day</div><div class="cw"><canvas id="c-fb-fans"></canvas></div></div>
-    </div>
-    <div class="crow c11">
       <div class="cc"><div class="ct">Daily Post Engagements</div><div class="cst">Total engagement actions per day</div><div class="cw"><canvas id="c-fb-eng"></canvas></div></div>
       <div class="cc"><div class="ct">Daily Page Views</div><div class="cst">Total visits to the Facebook Page</div><div class="cw"><canvas id="c-fb-views"></canvas></div></div>
     </div>
@@ -920,22 +915,6 @@ function initCharts(t){
     }
   }
   if(t==='fb'){
-    dc('c-fb-reach');
-    if(fb.reachByDay.length){
-      charts['c-fb-reach']=new Chart(document.getElementById('c-fb-reach'),{
-        type:'bar',
-        data:{labels:chartLabels(fb.reachByDay),datasets:[{data:fb.reachByDay.map(v=>v.value),backgroundColor:fb.reachByDay.map(v=>(v.value||0)>=100?'#1877F2':'#93B5F5'),borderRadius:3}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10}}}}}
-      });
-    }
-    dc('c-fb-fans');
-    if(fb.fanAddsByDay.length){
-      charts['c-fb-fans']=new Chart(document.getElementById('c-fb-fans'),{
-        type:'bar',
-        data:{labels:chartLabels(fb.fanAddsByDay),datasets:[{data:fb.fanAddsByDay.map(v=>v.value),backgroundColor:'#4A7C59',borderRadius:3}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0ece6'},ticks:{font:{size:10},stepSize:1},min:0}}}
-      });
-    }
     dc('c-fb-eng');
     if(fb.engByDay.length){
       charts['c-fb-eng']=new Chart(document.getElementById('c-fb-eng'),{
