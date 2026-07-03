@@ -97,6 +97,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 .cal-empty{min-height:54px;min-width:0;}
 .cal-day{background:#FAFAF8;border-radius:6px;min-height:54px;min-width:0;padding:4px 3px;position:relative;overflow:hidden;}
 .cal-day.has-post{background:#fff;border:1px solid #E4DCC9;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.cal-day.has-upcoming{background:#FBF6EC;border:1px dashed #D8B36C;box-shadow:none;}
 .cal-day.cal-today .cal-dn{background:#C99A4A;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
 .cal-dn{font-size:10px;color:#ccc;font-weight:600;margin-bottom:3px;line-height:1;}
 .cal-day.has-post .cal-dn{color:#182433;}
@@ -107,6 +108,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 .cal-thumb-wrap{display:block;position:relative;width:32px;height:32px;border-radius:4px;overflow:visible;cursor:pointer;flex-shrink:0;}
 .cal-thumb-wrap img,.cal-thumb-wrap .cal-ph{width:32px;height:32px;border-radius:4px;overflow:hidden;border:1.5px solid #D8C3A5;}
 .cal-thumb-wrap:hover img,.cal-thumb-wrap:hover .cal-ph{opacity:.8;}
+.cal-thumb-wrap.upcoming{cursor:default;opacity:.72;}
+.cal-thumb-wrap.upcoming img,.cal-thumb-wrap.upcoming .cal-ph{border-style:dashed;border-color:#C99A4A;}
+.cal-thumb-wrap.upcoming:hover img,.cal-thumb-wrap.upcoming:hover .cal-ph{opacity:1;}
+.cal-upcoming-badge{position:absolute;top:-4px;left:-4px;font-size:9px;line-height:1;background:#fff;border-radius:50%;padding:1px;box-shadow:0 1px 2px rgba(0,0,0,.15);}
 .cal-plat{position:absolute;bottom:-4px;right:-4px;font-size:7px;font-weight:800;padding:1px 3px;border-radius:3px;line-height:1.4;pointer-events:none;}
 .ig-plat{background:#833ab4;color:#fff;}
 .fb-plat{background:#1877F2;color:#fff;}

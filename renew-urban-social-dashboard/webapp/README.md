@@ -93,6 +93,27 @@ mock server that returns canned JSON in the same shape as the real Graph API
 is how this was verified end-to-end during development, without needing
 real credentials.
 
+## Upcoming posts (GoHighLevel Social Planner)
+
+Optional. If `GHL_API_KEY` and `GHL_LOCATION_ID` are set, the Overview tab
+shows an "Upcoming Posts" section and the content calendar marks scheduled
+(not-yet-published) days with a dashed gold border, pulled from GHL's
+Social Planner rather than Meta (Meta only ever returns posts that have
+already gone live).
+
+To set it up:
+1. In GHL, go to **Settings -> Private Integrations -> Create** and grant
+   it read access to Social Media Posting / Posts. Copy the token (starts
+   with `pit-`) into `GHL_API_KEY`.
+2. Set `GHL_LOCATION_ID` to this client's location (sub-account) ID in GHL.
+3. Restart the server (or redeploy). Leave both blank to just not show this
+   section at all -- nothing else on the dashboard depends on it.
+
+This is a separate credential and API from Meta's, matching the pattern
+already used in `ghl-renew-urban.plugin/server/ghl.js` elsewhere in this
+repo. It only ever reads posts (`type: scheduled`) -- nothing here creates,
+edits, or deletes anything in GHL.
+
 ## Auto-refresh
 
 The page automatically re-fetches the currently-viewed date range every 5

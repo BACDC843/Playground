@@ -11,6 +11,9 @@ const {
   META_FB_PAGE_ID,
   META_API_VERSION = 'v21.0',
   META_GRAPH_BASE_URL = 'https://graph.facebook.com',
+  GHL_API_KEY,
+  GHL_LOCATION_ID,
+  GHL_API_BASE = 'https://services.leadconnectorhq.com',
   PORT = 3000,
 } = process.env;
 
@@ -392,6 +395,86 @@ app.get('/api/dashboard', async (req, res) => {
     res.json({ current, previous });
   } catch (err) {
     res.status(500).json({ error: String(err?.message || err) });
+  }
+});
+
+// ── GoHighLevel Social Planner (upcoming/scheduled posts) ─────────────────
+// Completely separate credential and API from Meta -- GHL is where this
+// client's posts get scheduled before Meta ever sees them. Same
+// fail-gracefully approach as the community-management feature: if GHL
+// isn't configured or its API errors, /api/upcoming just reports itself
+// unavailable rather than affecting anything else on the dashboard.
+const GHL_API_VERSION = '2021-07-28';
+
+async function ghlFetch(path, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const resp = await fetch(`${GHL_API_BASE}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${GHL_API_KEY}`,
+        Version: GHL_API_VERSION,
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(`GHL API ${resp.status}: ${JSON.stringify(body).slice(0, 200)}`);
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+app.get('/api/upcoming', async (req, res) => {
+  if (!GHL_API_KEY || !GHL_LOCATION_ID) {
+    res.json({ available: false, reason: 'GHL_API_KEY/GHL_LOCATION_ID not configured (see server/.env.example)' });
+    return;
+  }
+  try {
+    const now = new Date();
+    const toDate = new Date(now.getTime() + 60 * 86400000); // next 60 days
+    const body = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/posts/list`, {
+      method: 'POST',
+      body: JSON.stringify({
+        skip: '0',
+        limit: '50',
+        fromDate: now.toISOString(),
+        toDate: toDate.toISOString(),
+        includeUsers: 'true',
+        type: 'scheduled',
+      }),
+    });
+    const posts = body?.results?.posts ?? body?.posts ?? [];
+    const upcoming = posts
+      .map((p) => {
+        const accountIds = p.accountIds || [];
+        const onIG = accountIds.some((id) => META_IG_ID && id.includes(META_IG_ID));
+        const onFB = accountIds.some((id) => META_FB_PAGE_ID && id.includes(META_FB_PAGE_ID));
+        if (!onIG && !onFB) return null; // not one of this dashboard's connected accounts
+        const media = (p.media || [])[0];
+        const isVideo = (media?.type || '').startsWith('video');
+        return {
+          id: p._id || p.postId,
+          caption: p.summary || '',
+          // Video posts carry a separate `thumbnail` (a real image) --
+          // media[0].url for those is the video file itself, not something
+          // an <img> tag can show.
+          mediaUrl: (isVideo ? p.thumbnail : media?.url) || p.thumbnail || null,
+          mediaType: media?.type || null,
+          scheduleDate: p.scheduleDate || p.displayDate,
+          postType: p.type || 'post',
+          instagram: onIG,
+          facebook: onFB,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.scheduleDate) - new Date(b.scheduleDate));
+    res.json({ available: true, upcoming });
+  } catch (err) {
+    res.json({ available: false, reason: String(err?.message || err) });
   }
 });
 

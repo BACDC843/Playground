@@ -316,6 +316,22 @@ function renderPostCalendar(){
         thumb:p.full_picture||null,url:p.permalink_url||'',
         title:(p.message||'').replace(/[\n\r]/g,' ').substring(0,45)||'FB Post'});
     });
+    // Scheduled-but-not-yet-published posts from GHL's Social Planner, if
+    // loaded -- always included regardless of the currently-viewed date
+    // range, since "what's coming up" is a fixed window, not tied to
+    // whatever historical period is being browsed. One entry per platform
+    // a post is scheduled to, matching how a cross-posted IG+FB item
+    // already shows as two separate published entries above.
+    if(UPCOMING_DATA&&UPCOMING_DATA.available&&UPCOMING_DATA.upcoming){
+      UPCOMING_DATA.upcoming.forEach(p=>{
+        const d=new Date(p.scheduleDate);
+        if(isNaN(d.getTime())) return;
+        const ds=d.toISOString().split('T')[0];
+        const title=(p.caption||'').replace(/[\n\r]/g,' ').substring(0,45)||'Scheduled post';
+        if(p.instagram) allPosts.push({date:d,ds,platform:'ig',thumb:p.mediaUrl||null,url:'',title,upcoming:true});
+        if(p.facebook) allPosts.push({date:d,ds,platform:'fb',thumb:p.mediaUrl||null,url:'',title,upcoming:true});
+      });
+    }
     if(!allPosts.length) return '<div class="nd" style="padding:16px;">No posts this period.</div>';
     const byDate={};
     allPosts.forEach(p=>{ if(!byDate[p.ds]) byDate[p.ds]=[]; byDate[p.ds].push(p); });
@@ -327,7 +343,15 @@ function renderPostCalendar(){
     });
     const monthKeys=Object.keys(months).sort();
     if(!monthKeys.length) return '<div class="nd" style="padding:16px;">No posts this period.</div>';
-    if(window._calMonthIdx===undefined||window._calMonthIdx<0||window._calMonthIdx>=monthKeys.length) window._calMonthIdx=monthKeys.length-1;
+    if(window._calMonthIdx===undefined||window._calMonthIdx<0||window._calMonthIdx>=monthKeys.length){
+      // Default to the current calendar month if it's in range (so adding
+      // future "upcoming" months doesn't change what opens by default),
+      // otherwise fall back to the most recent month with content.
+      const now=new Date();
+      const todayKey=now.getFullYear()+'-'+String(now.getMonth()).padStart(2,'0');
+      const todayIdx=monthKeys.indexOf(todayKey);
+      window._calMonthIdx=todayIdx>=0?todayIdx:monthKeys.length-1;
+    }
     const mk=monthKeys[window._calMonthIdx];
     const m=months[mk], year=m.year, month=m.month;
     const firstDow=new Date(year,month,1).getDay();
@@ -341,7 +365,6 @@ function renderPostCalendar(){
       const isToday=ds===todayStr;
       let thumbs='';
       posts.slice(0,4).forEach(p=>{
-        const safeUrl=(p.url||'#').replace(/"/g,'&quot;');
         const platIcon=p.platform==='ig'?'<span class="cal-plat ig-plat">IG</span>':'<span class="cal-plat fb-plat">FB</span>';
         let inner;
         if(p.thumb){
@@ -350,12 +373,21 @@ function renderPostCalendar(){
         } else {
           inner=`<div class="cal-ph">${p.platform==='ig'?'📷':'👍'}</div>`;
         }
-        // A real <a href target="_blank"> here, not a JS window.open() --
-        // Facebook/Instagram appear to treat JS-triggered popup navigation
-        // as suspicious and show a "log in to see this" wall, while a
-        // genuine link click (as used everywhere else in this dashboard)
-        // goes through fine.
-        thumbs+=`<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="cal-thumb-wrap" onclick="event.stopPropagation()" title="${p.title.replace(/"/g,'&quot;')}">${inner}${platIcon}</a>`;
+        const safeTitle=p.title.replace(/"/g,'&quot;');
+        if(p.upcoming){
+          // Nothing to link to yet -- it hasn't published -- so this is a
+          // plain, non-clickable div with a dashed border and a scheduled
+          // badge instead of the usual platform-only badge.
+          thumbs+=`<div class="cal-thumb-wrap upcoming" title="${safeTitle} (scheduled)">${inner}${platIcon}<span class="cal-upcoming-badge">📅</span></div>`;
+        } else {
+          const safeUrl=(p.url||'#').replace(/"/g,'&quot;');
+          // A real <a href target="_blank"> here, not a JS window.open() --
+          // Facebook/Instagram appear to treat JS-triggered popup navigation
+          // as suspicious and show a "log in to see this" wall, while a
+          // genuine link click (as used everywhere else in this dashboard)
+          // goes through fine.
+          thumbs+=`<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="cal-thumb-wrap" onclick="event.stopPropagation()" title="${safeTitle}">${inner}${platIcon}</a>`;
+        }
       });
       if(posts.length>4) thumbs+='<div class="cal-more">+'+(posts.length-4)+'</div>';
       let titleRow='';
@@ -365,7 +397,8 @@ function renderPostCalendar(){
       } else if(posts.length>1){
         titleRow='<div class="cal-title">'+posts.length+' posts</div>';
       }
-      cells+='<div class="cal-day'+(posts.length?' has-post':'')+(isToday?' cal-today':'')+'">'+
+      const allUpcoming=posts.length>0&&posts.every(p=>p.upcoming);
+      cells+='<div class="cal-day'+(posts.length?' has-post':'')+(allUpcoming?' has-upcoming':'')+(isToday?' cal-today':'')+'">'+
         '<div class="cal-dn">'+day+'</div>'+
         (thumbs?'<div class="cal-thumbs">'+thumbs+'</div>':'')+
         titleRow+'</div>';
@@ -426,6 +459,8 @@ function renderOV(){
   document.getElementById('tab-overview').innerHTML = `
     ${renderLiveBar()}
     <div class="exec-summary">${buildExecutiveSummary()}</div>
+    <div class="sec" id="upcoming-sec" style="display:none;">🗓️ Upcoming Posts <span class="pill" style="background:#243447;color:#fff;font-size:10px;">Next 60 Days · GHL</span></div>
+    <div id="upcoming-container"></div>
     <div class="sec">🏆 Top Post Spotlight</div>
     ${spotlight||'<div class="nd" style="margin-bottom:18px">No posts found — navigate to a month with content.</div>'}
     <div class="sec" style="margin-top:24px;">📅 Content Calendar <span class="pill" style="background:#182433;color:#fff;font-size:10px;">IG + FB</span></div>
@@ -450,6 +485,7 @@ function renderOV(){
     <div class="sec">Analytics &amp; Insights</div>
     <div class="twg">${renderTW(ig,fb,{reachEff,ctr,vAvg,cAvg,top5}).join('')}</div>
   `;
+  loadUpcoming();
 }
 
 function renderT5(p, i){
@@ -889,6 +925,73 @@ function renderCommunitySection(){
     <div class="kpi"><div class="kl">Posts With Comments</div><div class="kv">${d.postsWithComments}</div><div class="ks">this period</div></div>
     <div class="kpi"><div class="kl">Posts You Replied To</div><div class="kv">${d.postsWithReply}</div><div class="ks">at least one reply</div></div>
   </div>`;
+}
+
+// ── UPCOMING POSTS (from GHL Social Planner) ──────────
+// A fixed "what's scheduled in the next 60 days" list, independent of
+// whatever historical date range the rest of the dashboard is navigated
+// to -- fetched once per session and cached, same pattern as the growth
+// trend. Renders nothing (not even an empty section) if GHL isn't
+// configured or the account has nothing scheduled, so this degrades
+// invisibly for anyone who hasn't set up GHL_API_KEY/GHL_LOCATION_ID.
+let UPCOMING_DATA=null;
+
+async function loadUpcoming(){
+  const sec=document.getElementById('upcoming-sec');
+  const container=document.getElementById('upcoming-container');
+  if(!sec||!container) return;
+  if(UPCOMING_DATA){ renderUpcomingSection(); return; }
+  try{
+    const resp=await fetch('/api/upcoming');
+    const body=await resp.json().catch(()=>null);
+    UPCOMING_DATA=body;
+    renderUpcomingSection();
+  }catch(err){
+    UPCOMING_DATA=null;
+    sec.style.display='none';
+    container.innerHTML='';
+  }
+}
+
+function renderUpcomingSection(){
+  const sec=document.getElementById('upcoming-sec');
+  const container=document.getElementById('upcoming-container');
+  if(sec&&container){
+    const d=UPCOMING_DATA;
+    if(!d||!d.available||!d.upcoming||d.upcoming.length===0){
+      sec.style.display='none';
+      container.innerHTML='';
+    } else {
+      sec.style.display='';
+      container.innerHTML='<div class="pgrid">'+d.upcoming.slice(0,9).map(renderUpcomingCard).join('')+'</div>';
+    }
+  }
+  // The calendar renders from allPosts computed at call time, so it needs
+  // to be redrawn now that UPCOMING_DATA has actually arrived -- the first
+  // renderPostCalendar() call (before this fetch resolved) had none of it.
+  const calContainer=document.getElementById('cal-container');
+  if(calContainer) calContainer.innerHTML=renderPostCalendar();
+}
+
+function renderUpcomingCard(p){
+  const dt=new Date(p.scheduleDate);
+  const dateLabel=isNaN(dt.getTime())?'':dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const isVideo=(p.mediaType||'').startsWith('video');
+  const platBadges=(p.instagram?'<span class="cal-plat ig-plat" style="position:static;margin-right:3px;">IG</span>':'')+(p.facebook?'<span class="cal-plat fb-plat" style="position:static;">FB</span>':'');
+  return `
+    <div class="pc" style="cursor:default;">
+      <div class="piw">
+        ${imgTag(p.mediaUrl,'pimg','pph',isVideo?'▶':'🏠')}
+        <span class="ptyp" style="background:rgba(36,52,71,.85);">📅 Scheduled</span>
+      </div>
+      <div class="pb">
+        <div class="pcap">${(p.caption||'No caption').replace(/\n/g,' ')}</div>
+        <div class="pmets" style="align-items:center;">
+          <span style="font-size:11px;color:#6B6F73;">${dateLabel}</span>
+          ${platBadges}
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderInsights(){
