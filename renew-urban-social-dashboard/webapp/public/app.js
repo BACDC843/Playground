@@ -1,9 +1,14 @@
 // ── State ──────────────────────────────────────────────
 let tab = localStorage.getItem('ru_tab') || 'overview';
-let view = localStorage.getItem('ru_view') || 'month';
+// Default view on load is year-to-date (Jan 1 of the current year through
+// today) rather than just "this month" -- opening the dashboard fresh
+// should show how the year's going so far, not a view that resets sparse
+// every time a new month starts. Computed from the current year rather
+// than hardcoded so it doesn't need updating every January.
+let view = 'custom';
 let navDate = new Date();
 navDate = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
-let customRange = null; // { since, until } when a custom date range is active
+let customRange = { since: `${navDate.getFullYear()}-01-01`, until: fiso(new Date()) };
 
 let DATA = { since:null, until:null, igPosts:[], fbPosts:[], igIns:null, fbIns:null, refreshedAt:null };
 let PREV = null; // same shape as DATA, for the comparison period, or null
@@ -1294,6 +1299,10 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 // ── INIT ──────────────────────────────────────────────
+// Reflect the year-to-date default: neither Month nor Week is "on", and
+// the Clear Range button is available to drop back to the current month.
+document.getElementById('monthBtn').classList.remove('on');
+document.getElementById('drClear').style.display='inline-block';
 setTab(tab, true);
 loadData();
 startAutoRefresh();
