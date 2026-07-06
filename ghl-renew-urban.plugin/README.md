@@ -42,16 +42,56 @@ cd ghl-renew-urban.plugin/server && npm install
 
 The plugin starts a local MCP server (`ghl-api`) that exposes the GHL API directly to Claude:
 
+### Contacts
+
 | Tool | Description |
 |------|-------------|
 | `ghl_search_contacts` | Search contacts by name, email, or phone |
 | `ghl_get_contact` | Get full contact details by ID |
 | `ghl_update_contact` | Update contact tags, custom fields, or pipeline stage |
 | `ghl_add_contact_note` | Add a note to a contact |
+
+### Opportunities
+
+| Tool | Description |
+|------|-------------|
 | `ghl_search_opportunities` | Search deals by name or contact |
 | `ghl_get_opportunity` | Get full opportunity details by ID |
 | `ghl_update_opportunity` | Update stage, value, close date, or status |
 | `ghl_list_pipelines` | List all pipelines and their stages |
+
+### Social Planner
+
+| Tool | Description |
+|------|-------------|
+| `ghl_social_get_accounts` | List all connected social media accounts |
+| `ghl_social_list_posts` | List posts filtered by status, date range, account, or type |
+| `ghl_social_get_post` | Get full details for a single post by ID |
+| `ghl_social_create_post` | Create and schedule (or draft) a post to one or more accounts |
+| `ghl_social_update_post` | Edit an existing post (caption, schedule date, accounts, media) |
+| `ghl_social_delete_post` | Delete a post by ID |
+| `ghl_social_get_categories` | List all post categories |
+| `ghl_social_get_tags` | List all post tags |
+
+## Remote / Web Sessions (Claude Code on the Web)
+
+For Claude Code web sessions the local stdio server isn't reachable. Deploy `http-server.js` to Railway (a `railway.json` is included) and add the hosted URL as an MCP server in your environment settings on code.claude.com:
+
+```json
+{
+  "mcpServers": {
+    "ghl-api": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://<your-railway-url>/mcp"],
+      "env": {
+        "MCP_AUTH_TOKEN": "<your-mcp-auth-token>"
+      }
+    }
+  }
+}
+```
+
+Set `GHL_API_KEY`, `GHL_LOCATION_ID`, and `MCP_AUTH_TOKEN` as environment variables in your Railway service.
 
 ## Skills
 
