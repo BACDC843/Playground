@@ -352,10 +352,10 @@ function renderPostCalendar(){
         thumb:p.full_picture||null,url:p.permalink_url||'',
         title:(p.message||'').replace(/[\n\r]/g,' ').substring(0,45)||'FB Post'});
     });
-    // Scheduled-but-not-yet-published posts from GHL's Social Planner, if
-    // loaded -- always included regardless of the currently-viewed date
-    // range, since "what's coming up" is a fixed window, not tied to
-    // whatever historical period is being browsed. One entry per platform
+    // Scheduled-but-not-yet-published posts from Blotato, if loaded --
+    // always included regardless of the currently-viewed date range, since
+    // "what's coming up" is a fixed window, not tied to whatever historical
+    // period is being browsed. One entry per platform
     // a post is scheduled to, matching how a cross-posted IG+FB item
     // already shows as two separate published entries above.
     if(UPCOMING_DATA&&UPCOMING_DATA.available&&UPCOMING_DATA.upcoming){
@@ -495,7 +495,7 @@ function renderOV(){
   document.getElementById('tab-overview').innerHTML = `
     ${renderLiveBar()}
     <div class="exec-summary">${buildExecutiveSummary()}</div>
-    <div class="sec" id="upcoming-sec" style="display:none;">🗓️ Upcoming Posts <span class="pill" style="background:#243447;color:#fff;font-size:10px;">Next 60 Days · GHL</span></div>
+    <div class="sec" id="upcoming-sec" style="display:none;">🗓️ Upcoming Posts <span class="pill" style="background:#243447;color:#fff;font-size:10px;">Scheduled · Blotato</span></div>
     <div id="upcoming-container"></div>
     <div class="sec">🏆 Top Post Spotlight</div>
     ${spotlight||'<div class="nd" style="margin-bottom:18px">No posts found — navigate to a month with content.</div>'}
@@ -984,13 +984,13 @@ async function loadCalendar(){
   }
 }
 
-// ── UPCOMING POSTS (from GHL Social Planner) ──────────
-// A fixed "what's scheduled in the next 60 days" list, independent of
-// whatever historical date range the rest of the dashboard is navigated
-// to -- fetched once per session and cached, same pattern as the growth
-// trend. Renders nothing (not even an empty section) if GHL isn't
-// configured or the account has nothing scheduled, so this degrades
-// invisibly for anyone who hasn't set up GHL_API_KEY/GHL_LOCATION_ID.
+// ── UPCOMING POSTS (from Blotato) ──────────────────────
+// A fixed "what's scheduled next" list, independent of whatever historical
+// date range the rest of the dashboard is navigated to -- fetched once per
+// session and cached, same pattern as the growth trend. Renders nothing
+// (not even an empty section) if Blotato isn't configured or the account
+// has nothing scheduled, so this degrades invisibly for anyone who hasn't
+// set up BLOTATO_API_KEY.
 let UPCOMING_DATA=null;
 
 async function loadUpcoming(){

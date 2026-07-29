@@ -11,9 +11,13 @@ const {
   META_FB_PAGE_ID,
   META_API_VERSION = 'v21.0',
   META_GRAPH_BASE_URL = 'https://graph.facebook.com',
-  GHL_API_KEY,
-  GHL_LOCATION_ID,
-  GHL_API_BASE = 'https://services.leadconnectorhq.com',
+  BLOTATO_API_KEY,
+  BLOTATO_API_BASE = 'https://backend.blotato.com',
+  // Blotato's account IDs are internal to Blotato and don't line up with
+  // Meta's IG Business Account ID, so IG schedules are matched by username
+  // instead. FB schedules match on pageId, which IS the real Meta Page ID
+  // (same value as META_FB_PAGE_ID) so no separate env var is needed there.
+  BLOTATO_IG_USERNAME = 'renew_urban',
   PORT = 3000,
 } = process.env;
 
@@ -423,79 +427,85 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-// ── GoHighLevel Social Planner (upcoming/scheduled posts) ─────────────────
-// Completely separate credential and API from Meta -- GHL is where this
-// client's posts get scheduled before Meta ever sees them. Same
-// fail-gracefully approach as the community-management feature: if GHL
-// isn't configured or its API errors, /api/upcoming just reports itself
-// unavailable rather than affecting anything else on the dashboard.
-const GHL_API_VERSION = '2021-07-28';
-
-async function ghlFetch(path, options = {}) {
+// ── Blotato (upcoming/scheduled posts) ─────────────────────────────────────
+// This client's posts get scheduled through Blotato before Meta ever sees
+// them (GHL's social planner was retired 2026-07-26). Same fail-gracefully
+// approach as the community-management feature: if Blotato isn't configured
+// or its API errors, /api/upcoming just reports itself unavailable rather
+// than affecting anything else on the dashboard.
+async function blotatoFetch(path, params = {}) {
+  const url = new URL(`${BLOTATO_API_BASE}${path}`);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const resp = await fetch(`${GHL_API_BASE}${path}`, {
-      ...options,
+    const resp = await fetch(url, {
       signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${GHL_API_KEY}`,
-        Version: GHL_API_VERSION,
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
+      headers: { 'blotato-api-key': BLOTATO_API_KEY },
     });
     const body = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(`GHL API ${resp.status}: ${JSON.stringify(body).slice(0, 200)}`);
+    if (!resp.ok) throw new Error(`Blotato API ${resp.status}: ${JSON.stringify(body).slice(0, 200)}`);
     return body;
   } finally {
     clearTimeout(timer);
   }
 }
 
+// The Blotato workspace behind this key is shared across every client this
+// agency runs through it (Renew Urban, Lowcountry AI Workshop, Charleston
+// Media Group itself) -- /v2/schedules returns ALL of them mixed together,
+// so results are filtered per-item below rather than trusting the endpoint
+// to scope by account. Paginates via cursor up to 10 pages (500 schedules),
+// far more than this workspace has queued at once across every client.
+async function getBlotatoSchedules() {
+  const all = [];
+  let cursor;
+  for (let page = 0; page < 10; page++) {
+    const body = await blotatoFetch('/v2/schedules', cursor ? { limit: 50, cursor } : { limit: 50 });
+    const items = body?.items ?? [];
+    all.push(...items);
+    cursor = body?.cursor;
+    if (!cursor || items.length === 0) break;
+  }
+  return all;
+}
+
+// FB schedules carry the real Meta Page ID as draft.target.pageId, so they
+// match directly against META_FB_PAGE_ID. IG schedules only carry Blotato's
+// own internal account id (not Meta's IG Business Account ID), so those are
+// matched by the connected IG username instead.
+function isRenewUrbanSchedule(item) {
+  const targetType = item.draft?.target?.targetType;
+  if (targetType === 'facebook') return item.draft?.target?.pageId === META_FB_PAGE_ID;
+  if (targetType === 'instagram') {
+    return (item.account?.username || '').toLowerCase() === BLOTATO_IG_USERNAME.toLowerCase();
+  }
+  return false;
+}
+
 app.get('/api/upcoming', async (req, res) => {
-  if (!GHL_API_KEY || !GHL_LOCATION_ID) {
-    res.json({ available: false, reason: 'GHL_API_KEY/GHL_LOCATION_ID not configured (see server/.env.example)' });
+  if (!BLOTATO_API_KEY) {
+    res.json({ available: false, reason: 'BLOTATO_API_KEY not configured (see server/.env.example)' });
     return;
   }
   try {
-    const now = new Date();
-    const toDate = new Date(now.getTime() + 60 * 86400000); // next 60 days
-    const body = await ghlFetch(`/social-media-posting/${GHL_LOCATION_ID}/posts/list`, {
-      method: 'POST',
-      body: JSON.stringify({
-        skip: '0',
-        limit: '50',
-        fromDate: now.toISOString(),
-        toDate: toDate.toISOString(),
-        includeUsers: 'true',
-        type: 'scheduled',
-      }),
-    });
-    const posts = body?.results?.posts ?? body?.posts ?? [];
-    const upcoming = posts
-      .map((p) => {
-        const accountIds = p.accountIds || [];
-        const onIG = accountIds.some((id) => META_IG_ID && id.includes(META_IG_ID));
-        const onFB = accountIds.some((id) => META_FB_PAGE_ID && id.includes(META_FB_PAGE_ID));
-        if (!onIG && !onFB) return null; // not one of this dashboard's connected accounts
-        const media = (p.media || [])[0];
-        const isVideo = (media?.type || '').startsWith('video');
+    const schedules = await getBlotatoSchedules();
+    const upcoming = schedules
+      .filter(isRenewUrbanSchedule)
+      .map((item) => {
+        const targetType = item.draft?.target?.targetType;
+        const mediaUrls = item.draft?.content?.mediaUrls || [];
         return {
-          id: p._id || p.postId,
-          caption: p.summary || '',
-          // Video posts carry a separate `thumbnail` (a real image) --
-          // media[0].url for those is the video file itself, not something
-          // an <img> tag can show.
-          mediaUrl: (isVideo ? p.thumbnail : media?.url) || p.thumbnail || null,
-          mediaType: media?.type || null,
-          scheduleDate: p.scheduleDate || p.displayDate,
-          postType: p.type || 'post',
-          instagram: onIG,
-          facebook: onFB,
+          id: item.id,
+          caption: item.draft?.content?.text || '',
+          mediaUrl: mediaUrls[0] || null,
+          mediaType: mediaUrls[0] ? 'image' : null,
+          scheduleDate: item.scheduledAt,
+          postType: 'post',
+          instagram: targetType === 'instagram',
+          facebook: targetType === 'facebook',
         };
       })
-      .filter(Boolean)
       .sort((a, b) => new Date(a.scheduleDate) - new Date(b.scheduleDate));
     res.json({ available: true, upcoming });
   } catch (err) {
