@@ -171,6 +171,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 .pm.ig{border-color:var(--ig1)} .pm.fb{border-color:var(--fb)}
 .pm strong{color:var(--dark);font-weight:700}
 
+/* ── UPCOMING POSTS (compact list, not the big pgrid cards) ── */
+.up-list{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.up-row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
+.up-thumb{width:38px;height:38px;border-radius:6px;overflow:hidden;flex-shrink:0;background:#EFE9DE}
+.up-img{width:100%;height:100%;object-fit:cover;display:block}
+.up-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:14px;background:linear-gradient(145deg,#0B1F2E,#13283A);color:rgba(255,255,255,.35)}
+.up-body{flex:1;min-width:0}
+.up-cap{font-size:12px;line-height:1.3;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.up-meta{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);margin-top:2px}
+
 /* ── TAKEAWAYS ── */
 .twg{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:18px}
 .tw{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:15px;position:relative;overflow:hidden}

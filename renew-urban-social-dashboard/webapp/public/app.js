@@ -495,12 +495,12 @@ function renderOV(){
   document.getElementById('tab-overview').innerHTML = `
     ${renderLiveBar()}
     <div class="exec-summary">${buildExecutiveSummary()}</div>
-    <div class="sec" id="upcoming-sec" style="display:none;">🗓️ Upcoming Posts <span class="pill" style="background:#243447;color:#fff;font-size:10px;">Scheduled · Blotato</span></div>
-    <div id="upcoming-container"></div>
     <div class="sec">🏆 Top Post Spotlight</div>
     ${spotlight||'<div class="nd" style="margin-bottom:18px">No posts found — navigate to a month with content.</div>'}
     <div class="sec" style="margin-top:24px;">📅 Content Calendar <span class="pill" style="background:#182433;color:#fff;font-size:10px;">IG + FB</span></div>
     <div class="cal-wrap"><div id="cal-container">${renderPostCalendar()}</div></div>
+    <div class="sec" id="upcoming-sec" style="display:none;margin-top:24px;">🗓️ Upcoming Posts <span class="pill" style="background:#243447;color:#fff;font-size:10px;">Scheduled · Blotato</span></div>
+    <div id="upcoming-container"></div>
     <div class="sec">Combined Performance <span class="pill p-live">LIVE</span></div>
     <div class="kg g5">
       <div class="kpi hi">${klbl('IG Reach','Unique Instagram accounts that saw at least one of your posts this period.')}<div class="kv">${ig.totalReach.toLocaleString()}${momBadge(ig.totalReach,pm&&pm.igReach)}</div><div class="ks">unique accounts</div></div>
@@ -1020,7 +1020,7 @@ function renderUpcomingSection(){
       container.innerHTML='';
     } else {
       sec.style.display='';
-      container.innerHTML='<div class="pgrid">'+d.upcoming.slice(0,9).map(renderUpcomingCard).join('')+'</div>';
+      container.innerHTML='<div class="up-list">'+d.upcoming.slice(0,9).map(renderUpcomingCard).join('')+'</div>';
     }
   }
   // The calendar renders from allPosts computed at call time, so it needs
@@ -1036,17 +1036,11 @@ function renderUpcomingCard(p){
   const isVideo=(p.mediaType||'').startsWith('video');
   const platBadges=(p.instagram?'<span class="cal-plat ig-plat" style="position:static;margin-right:3px;">IG</span>':'')+(p.facebook?'<span class="cal-plat fb-plat" style="position:static;">FB</span>':'');
   return `
-    <div class="pc" style="cursor:default;">
-      <div class="piw">
-        ${imgTag(p.mediaUrl,'pimg','pph',isVideo?'▶':'🏠')}
-        <span class="ptyp" style="background:rgba(36,52,71,.85);">📅 Scheduled</span>
-      </div>
-      <div class="pb">
-        <div class="pcap">${(p.caption||'No caption').replace(/\n/g,' ')}</div>
-        <div class="pmets" style="align-items:center;">
-          <span style="font-size:11px;color:#6B6F73;">${dateLabel}</span>
-          ${platBadges}
-        </div>
+    <div class="up-row">
+      <div class="up-thumb">${imgTag(p.mediaUrl,'up-img','up-ph',isVideo?'▶':'🏠')}</div>
+      <div class="up-body">
+        <div class="up-cap">${(p.caption||'No caption').replace(/\n/g,' ')}</div>
+        <div class="up-meta"><span>📅 ${dateLabel}</span>${platBadges}</div>
       </div>
     </div>`;
 }
