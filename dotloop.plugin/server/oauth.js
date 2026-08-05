@@ -65,6 +65,22 @@ export function createOAuthProvider({ publicUrl, mcpPath, clientId, clientSecret
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
+      // A redirect rejection is worth spelling out: Dotloop compares the value
+      // byte for byte, so a stray space or unicode dash in the registered field
+      // produces a mismatch against a value that looks identical in their UI.
+      if (JSON.stringify(body).includes("Invalid redirect")) {
+        process.stderr.write(
+          "\n" + "=".repeat(64) +
+            "\nDotloop rejected our redirect_uri.\n\n" +
+            `We sent, exactly: ${JSON.stringify(dotloopRedirect)}\n` +
+            `Length: ${dotloopRedirect.length} chars\n` +
+            `Code points: ${[...dotloopRedirect].map((c) => c.codePointAt(0)).join(",")}\n\n` +
+            "Compare against the Redirect URL saved on the Dotloop client. If the\n" +
+            "text looks identical, the saved value likely carries trailing\n" +
+            "whitespace or a non-ASCII character — delete it, retype it by hand,\n" +
+            "and save again.\n" + "=".repeat(64) + "\n"
+        );
+      }
       throw new Error(`Dotloop token request failed (${res.status}): ${JSON.stringify(body)}`);
     }
     return body;
