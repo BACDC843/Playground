@@ -91,6 +91,77 @@ const authorizeUrl =
     redirect_uri: REDIRECT_URI,
   });
 
+function reportSuccess(token) {
+  console.log("\n" + "=".repeat(70));
+  console.log("SUCCESS — add this line to server/.env:\n");
+  console.log(`DOTLOOP_REFRESH_TOKEN=${token.refresh_token}`);
+  console.log("\n" + "=".repeat(70));
+  console.log(
+    "\nTreat this like a password. It does not expire and grants access to\n" +
+      "your Dotloop data. Never commit it or paste it into a chat window.\n"
+  );
+}
+
+/**
+ * Manual mode — for redirect URLs this script cannot serve, such as an https
+ * URL or one pointing at a real domain. Dotloop still redirects the browser
+ * there with ?code=... in the query string, even if the page fails to load,
+ * so the code can simply be copied out of the address bar.
+ */
+async function runManual(reason) {
+  const { createInterface } = await import("readline/promises");
+
+  if (reason) console.log(`\n${reason}`);
+
+  console.log("\nStep 1. Open this URL in your browser, log into Dotloop, and click Approve:\n");
+  console.log(authorizeUrl);
+  console.log(
+    `\nStep 2. Your browser will be sent to ${REDIRECT_URI} — that page will\n` +
+      "probably show an error, which is fine. What matters is the address bar.\n" +
+      "Copy the WHOLE URL from it and paste it below.\n"
+  );
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = (await rl.question("Paste the redirected URL (or just the code): ")).trim();
+  rl.close();
+
+  let code = answer;
+  if (answer.includes("?") || answer.includes("code=")) {
+    try {
+      code = new URL(answer).searchParams.get("code") ?? code;
+    } catch {
+      code = new URLSearchParams(answer.split("?").pop()).get("code") ?? code;
+    }
+  }
+
+  if (!code) {
+    console.error("\nCould not find a code in that input.");
+    process.exit(1);
+  }
+
+  try {
+    reportSuccess(await exchangeCode(code));
+  } catch (err) {
+    console.error(`\n${err.message}`);
+    process.exit(1);
+  }
+}
+
+// A redirect URL this script cannot listen on has to be handled by hand.
+const canServeRedirect = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(REDIRECT_URI);
+
+if (process.argv.includes("--manual")) {
+  await runManual();
+} else if (!canServeRedirect) {
+  await runManual(
+    `Your redirect URL is ${REDIRECT_URI}, which this script cannot listen on.\n` +
+      "Switching to manual mode — same result, one extra copy/paste."
+  );
+} else {
+  startCallbackServer();
+}
+
+function startCallbackServer() {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname !== "/callback") {
@@ -123,14 +194,7 @@ const server = createServer(async (req, res) => {
         "You can close this tab.</p>"
     );
 
-    console.log("\n" + "=".repeat(70));
-    console.log("SUCCESS — add this line to server/.env:\n");
-    console.log(`DOTLOOP_REFRESH_TOKEN=${token.refresh_token}`);
-    console.log("\n" + "=".repeat(70));
-    console.log(
-      "\nTreat this like a password. It does not expire and grants access to\n" +
-        "your Dotloop data. Never commit it or paste it into a chat window.\n"
-    );
+    reportSuccess(token);
   } catch (err) {
     res.writeHead(500, { "Content-Type": "text/html" });
     res.end(`<h1>Token exchange failed</h1><pre>${err.message}</pre>`);
@@ -145,5 +209,15 @@ server.listen(PORT, () => {
   console.log("\nOpen this URL in your browser, log into Dotloop, and click Approve:\n");
   console.log(authorizeUrl);
   console.log(`\nWaiting for the redirect to ${REDIRECT_URI} ...`);
-  console.log("(Press Ctrl+C to cancel.)\n");
+  console.log("(Press Ctrl+C to cancel, or rerun with --manual to paste the code by hand.)\n");
 });
+
+server.on("error", async (err) => {
+  if (err.code === "EADDRINUSE") {
+    await runManual(`Port ${PORT} is already in use. Switching to manual mode.`);
+  } else {
+    console.error(`\n${err.message}`);
+    process.exit(1);
+  }
+});
+}
