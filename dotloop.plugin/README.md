@@ -219,11 +219,15 @@ structured fields — price, closing date, inspection deadline, earnest money,
 commission. That answers most questions without opening a file. Download PDFs
 only when you need language that isn't a form field.
 
-**PDF download is unverified.** `dotloop_download_document` requests the document
-endpoint with `Accept: application/pdf`. Dotloop's public docs describe that
-endpoint's JSON metadata response but don't spell out binary retrieval, so this
-path needs testing against a live account. Use `as: "metadata"` to inspect what
-the endpoint actually returns.
+**Document downloads need a grant from Dotloop.** Tested against a live
+account: listing documents and reading their metadata work, but requesting the
+content returns `403 FORBIDDEN` on every document, folder, and response mode.
+That is a permission Dotloop applies to the API client on their side, not a
+problem with the request — their onboarding email offers to "apply any
+additional permissions if applicable," and this is one of them. Ask your
+Partner Success Manager to enable document content access.
+
+The tool reports this case with that explanation rather than a raw 403.
 
 **Writes are real.** Update, create, and delete tools modify live transaction
 records. `dotloop_remove_participant` and `dotloop_delete_contact` cannot be

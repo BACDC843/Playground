@@ -637,6 +637,23 @@ export function makeCallTool(dotloopFetch, { downloadDir = tmpdir() } = {}) {
         const res = await dotloopFetch(path, {
           raw: true,
           headers: { Accept: "application/pdf" },
+        }).catch((err) => {
+          // Metadata on the same document succeeds, so a 403 here is a grant on
+          // document content rather than anything wrong with the request.
+          if (/\b403\b/.test(err.message)) {
+            throw new Error(
+              "Dotloop denied access to this document's content (403).\n\n" +
+                "Listing documents and reading their metadata works, so this is a " +
+                "permission on document downloads rather than a problem with the " +
+                "request. Dotloop applies that grant on their side — ask your " +
+                "Partner Success Manager to enable document content access for " +
+                "this API client.\n\n" +
+                "Until then, use dotloop_get_loop_detail for contract terms " +
+                "(price, dates, commission, earnest money) and " +
+                "dotloop_list_documents to see what paperwork exists."
+            );
+          }
+          throw err;
         });
 
         const buffer = Buffer.from(await res.arrayBuffer());
