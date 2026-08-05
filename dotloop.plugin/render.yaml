@@ -1,0 +1,50 @@
+# Render Blueprint for the Dotloop MCP server.
+#
+# Put this file at the repository root (or point Render's Blueprint flow at it)
+# and Render creates the service with the right build, health check, and disk.
+#
+# The plan is deliberately NOT free. A free Render service spins down after 15
+# minutes idle and takes about a minute to wake, but Claude gives OAuth
+# discovery, registration, and token endpoints only 10 seconds to respond — so
+# the first connection after any quiet period would fail. Free instances also
+# cannot attach a disk, which would drop every agent's connection on restart.
+#
+# Secrets are marked sync: false, so Render prompts for them during setup
+# instead of storing them in this file.
+
+services:
+  - name: dotloop-mcp
+    type: web
+    runtime: node
+    plan: starter
+    rootDir: dotloop.plugin/server
+    buildCommand: npm install
+    startCommand: node http-server.js
+    healthCheckPath: /health
+
+    # Holds each agent's Dotloop grant. Without this, a redeploy signs everyone out.
+    disk:
+      name: oauth-store
+      mountPath: /var/data
+      sizeGB: 1
+
+    envVars:
+      # From your Dotloop Application Client.
+      - key: DOTLOOP_CLIENT_ID
+        sync: false
+      - key: DOTLOOP_CLIENT_SECRET
+        sync: false
+
+      # The public URL of THIS service, no trailing slash. Setting it turns on
+      # OAuth mode. For a service named dotloop-mcp this is:
+      #   https://dotloop-mcp.onrender.com
+      - key: PUBLIC_URL
+        sync: false
+
+      # Optional. Enables GET /agents to list who is connected.
+      - key: MCP_AUTH_TOKEN
+        sync: false
+
+      # Must sit on the mounted disk to survive deploys.
+      - key: STORE_PATH
+        value: /var/data/oauth.json
