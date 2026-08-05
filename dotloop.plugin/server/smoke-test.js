@@ -8,33 +8,11 @@
  * Usage: npm run smoke
  */
 
-import { readFile } from "fs/promises";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-
+import { loadEnv } from "./env.js";
 import { createTokenManager, EnvTokenStore } from "./auth.js";
 import { makeDotloopFetch, makeCallTool } from "./dotloop.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
-
-async function loadDotEnv() {
-  try {
-    const raw = await readFile(join(here, ".env"), "utf8");
-    for (const line of raw.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eq = trimmed.indexOf("=");
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-      if (!(key in process.env)) process.env[key] = value;
-    }
-  } catch {
-    // No .env file — rely on the ambient environment.
-  }
-}
-
-await loadDotEnv();
+loadEnv();
 
 const { DOTLOOP_CLIENT_ID, DOTLOOP_CLIENT_SECRET, DOTLOOP_REFRESH_TOKEN } = process.env;
 

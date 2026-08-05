@@ -17,34 +17,12 @@
  */
 
 import { createServer } from "http";
-import { readFile } from "fs/promises";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 
+import { loadEnv } from "./env.js";
 const AUTH_URL = "https://auth.dotloop.com/oauth/authorize";
 const TOKEN_URL = "https://auth.dotloop.com/oauth/token";
 
-const here = dirname(fileURLToPath(import.meta.url));
-
-/** Loads server/.env into process.env without adding a dependency. */
-async function loadDotEnv() {
-  try {
-    const raw = await readFile(join(here, ".env"), "utf8");
-    for (const line of raw.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const eq = trimmed.indexOf("=");
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      const value = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "");
-      if (!(key in process.env)) process.env[key] = value;
-    }
-  } catch {
-    // No .env file — rely on the ambient environment.
-  }
-}
-
-await loadDotEnv();
+loadEnv();
 
 const CLIENT_ID = process.env.DOTLOOP_CLIENT_ID;
 const CLIENT_SECRET = process.env.DOTLOOP_CLIENT_SECRET;

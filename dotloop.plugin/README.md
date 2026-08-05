@@ -81,28 +81,30 @@ plugin installed, run `/dotloop-status` to confirm the connection.
 
 ### Claude Desktop
 
-Add to your Claude Desktop MCP config, using absolute paths:
+The server reads `server/.env` itself, so credentials stay out of the Desktop
+config. Add this to your Claude Desktop MCP config, using an absolute path:
 
 ```json
 {
   "mcpServers": {
     "dotloop": {
       "command": "node",
-      "args": ["/absolute/path/to/dotloop.plugin/server/index.js"],
-      "env": {
-        "DOTLOOP_CLIENT_ID": "...",
-        "DOTLOOP_CLIENT_SECRET": "...",
-        "DOTLOOP_REFRESH_TOKEN": "..."
-      }
+      "args": ["/absolute/path/to/dotloop.plugin/server/index.js"]
     }
   }
 }
 ```
 
+On Windows, escape the backslashes:
+`"C:\\Users\\you\\Playground\\dotloop.plugin\\server\\index.js"`
+
+Restart Claude Desktop, then ask it to list your Dotloop profiles to confirm.
+
 ### Cowork (web and mobile)
 
-Cowork needs the server reachable over HTTP, so deploy `http-server.js`.
-`railway.json` is included for Railway; Render and Fly work the same way.
+Cowork can't launch a program on your machine, so the server has to be
+reachable over HTTP. Deploy `http-server.js`; `railway.json` is included for
+Railway, and Render and Fly work the same way.
 
 Set these environment variables on the host:
 
@@ -119,8 +121,40 @@ Generate the auth token with:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-The MCP endpoint is `POST https://<your-host>/mcp`, with `GET /health` for
-health checks.
+Then add it in Cowork as a custom connector:
+
+- **URL** — `https://<your-host>/mcp`
+- **Header** — `Authorization: Bearer <your MCP_AUTH_TOKEN>`
+
+`GET /health` is available for the platform's health check.
+
+> Do not commit `.env` to the repo to deploy it. Set the variables through the
+> host's own environment settings — Railway and Render both provide this, and
+> real environment variables take precedence over any `.env` file.
+
+---
+
+## Where downloaded documents go
+
+`dotloop_download_document` writes PDFs to disk and returns the path. By
+default that's the OS temp directory. Point it anywhere — including a synced
+Dropbox or OneDrive folder — with `DOTLOOP_DOWNLOAD_DIR` in `server/.env`:
+
+```bash
+# Windows — forward slashes also work and avoid escaping entirely
+DOTLOOP_DOWNLOAD_DIR=C:\Users\you\Dropbox\Dotloop Docs
+
+# macOS
+DOTLOOP_DOWNLOAD_DIR=/Users/you/Dropbox/Dotloop Docs
+```
+
+Nested folders are created automatically, and paths containing spaces are
+fine. Quotes are optional; if present they're stripped.
+
+**This applies to the local server only.** A hosted deployment writes to the
+server's own disk, which is ephemeral and not your Dropbox. If you want
+downloads landing in a synced folder, run the stdio server locally (Claude
+Code or Claude Desktop) for that work.
 
 ---
 

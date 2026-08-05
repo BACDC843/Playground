@@ -12,8 +12,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { tmpdir } from "os";
 
+import { loadEnv } from "./env.js";
 import { createTokenManager, EnvTokenStore } from "./auth.js";
 import { TOOLS, makeDotloopFetch, makeCallTool } from "./dotloop.js";
+
+// Lets Claude Desktop point at this file without credentials in its config.
+loadEnv();
 
 const {
   DOTLOOP_CLIENT_ID,

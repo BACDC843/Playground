@@ -18,8 +18,12 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
+import { loadEnv } from "./env.js";
 import { createTokenManager, EnvTokenStore } from "./auth.js";
 import { TOOLS, makeDotloopFetch, makeCallTool } from "./dotloop.js";
+
+// No-op when hosted — platform-provided variables take precedence.
+loadEnv();
 
 const {
   DOTLOOP_CLIENT_ID,
