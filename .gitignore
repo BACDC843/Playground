@@ -4,3 +4,7 @@
 
 # Node
 node_modules/
+
+# OAuth grant store (contains agents' Dotloop refresh tokens)
+**/data/oauth.json
+**/server/data/

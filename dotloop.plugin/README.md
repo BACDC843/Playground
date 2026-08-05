@@ -100,37 +100,60 @@ On Windows, escape the backslashes:
 
 Restart Claude Desktop, then ask it to list your Dotloop profiles to confirm.
 
-### Cowork (web and mobile)
+### Hosted, for a whole brokerage (Desktop, Cowork, web, mobile)
 
-Cowork can't launch a program on your machine, so the server has to be
-reachable over HTTP. Deploy `http-server.js`; `railway.json` is included for
-Railway, and Render and Fly work the same way.
+This is the mode to use when other agents need access. Deploy once; each agent
+adds the connector, logs into Dotloop themselves, and sees only their own
+loops. Nobody installs anything and no refresh tokens get passed around.
 
-Set these environment variables on the host:
+Claude's custom-connector UI has no field for a static bearer token, so the
+hosted server implements OAuth 2.0 and brokers the real login to Dotloop:
+
+```
+Claude  --OAuth-->  this server  --OAuth-->  Dotloop
+```
+
+**Deploy** `http-server.js` (`railway.json` is included; Render and Fly work
+the same way) with these environment variables:
 
 | Variable | Purpose |
 |---|---|
 | `DOTLOOP_CLIENT_ID` | From Step 1 |
 | `DOTLOOP_CLIENT_SECRET` | From Step 1 |
-| `DOTLOOP_REFRESH_TOKEN` | From Step 2 |
-| `MCP_AUTH_TOKEN` | A secret you invent; clients must send it as `Authorization: Bearer <token>` |
+| `PUBLIC_URL` | The public https base URL, no trailing slash. **Setting this turns on OAuth mode.** |
+| `STORE_PATH` | Optional. Where agent grants persist — point it at a mounted volume. |
+| `MCP_AUTH_TOKEN` | Optional. Enables `GET /agents` to list who is connected. |
 
-Generate the auth token with:
+**Then add the callback to your Dotloop client.** In the Dotloop account that
+owns the Application Client, add this to its Redirect URLs:
 
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+https://<your-host>/oauth/dotloop-callback
 ```
 
-Then add it in Cowork as a custom connector:
+Dotloop matches redirect URLs exactly, so every agent login fails until this is
+registered. The server prints the exact URL on startup.
 
-- **URL** — `https://<your-host>/mcp`
-- **Header** — `Authorization: Bearer <your MCP_AUTH_TOKEN>`
+**What each agent does** — no install, about two minutes:
 
-`GET /health` is available for the platform's health check.
+1. In Claude Desktop or Cowork, go to **Settings > Connectors > Add custom connector**
+2. Paste `https://<your-host>/mcp` — leave the OAuth client fields blank
+3. Click connect, log into Dotloop, click Approve
 
-> Do not commit `.env` to the repo to deploy it. Set the variables through the
-> host's own environment settings — Railway and Render both provide this, and
-> real environment variables take precedence over any `.env` file.
+`DOTLOOP_REFRESH_TOKEN` is not used in this mode. Each agent's token is
+obtained through their own login and stored server-side; the admin listing at
+`GET /agents` shows connected accounts by email and never returns tokens.
+
+> Don't commit `.env` to deploy. Set variables through the host's own
+> environment settings — real environment variables take precedence over the
+> file, and `data/oauth.json` holds live agent credentials.
+
+### Single-account mode
+
+Setting `MCP_AUTH_TOKEN` and `DOTLOOP_REFRESH_TOKEN` while leaving `PUBLIC_URL`
+unset serves one fixed Dotloop account to any caller presenting that bearer
+token. Useful for testing and scripts. Claude's connector UI cannot supply a
+static bearer token, so this is not the path for agents.
 
 ---
 
