@@ -52,19 +52,54 @@ const {
   PORT = "3000",
 } = process.env;
 
-if (!DOTLOOP_CLIENT_ID || !DOTLOOP_CLIENT_SECRET) {
-  process.stderr.write("Error: DOTLOOP_CLIENT_ID and DOTLOOP_CLIENT_SECRET are required.\n");
+const OAUTH_MODE = Boolean(PUBLIC_URL);
+
+/**
+ * A hosted process that exits on boot shows up only as a 502, so the reason has
+ * to be legible in the logs. Name the missing variables rather than the rule.
+ */
+function fail(lines) {
+  process.stderr.write(
+    "\n" + "=".repeat(64) + "\nDotloop MCP server cannot start.\n\n" +
+      lines.join("\n") +
+      "\n\nSeen in this environment: " +
+      Object.keys(process.env)
+        .filter((k) => k.startsWith("DOTLOOP_") || k === "PUBLIC_URL" || k === "MCP_AUTH_TOKEN")
+        .sort()
+        .join(", ") +
+      "\n" + "=".repeat(64) + "\n"
+  );
   process.exit(1);
 }
 
-const OAUTH_MODE = Boolean(PUBLIC_URL);
+const missing = [
+  ["DOTLOOP_CLIENT_ID", DOTLOOP_CLIENT_ID],
+  ["DOTLOOP_CLIENT_SECRET", DOTLOOP_CLIENT_SECRET],
+].filter(([, v]) => !v);
+
+if (missing.length) {
+  fail([`Missing required variable(s): ${missing.map(([k]) => k).join(", ")}`]);
+}
 
 if (!OAUTH_MODE && !(MCP_AUTH_TOKEN && DOTLOOP_REFRESH_TOKEN)) {
-  process.stderr.write(
-    "Error: set PUBLIC_URL for OAuth mode, or MCP_AUTH_TOKEN plus\n" +
-      "DOTLOOP_REFRESH_TOKEN for single-account mode.\n"
-  );
-  process.exit(1);
+  fail([
+    "No mode selected.",
+    "",
+    "  For agents (Desktop, Cowork, mobile), set:",
+    "    PUBLIC_URL=https://<your-host>      <- no trailing slash",
+    "",
+    "  For a single fixed account, set BOTH:",
+    "    MCP_AUTH_TOKEN and DOTLOOP_REFRESH_TOKEN",
+  ]);
+}
+
+if (OAUTH_MODE && !/^https?:\/\/[^/]+$/.test(PUBLIC_URL)) {
+  // A trailing slash or a path silently breaks OAuth discovery, because the
+  // resource URL then no longer matches what the user typed into Claude.
+  fail([
+    `PUBLIC_URL is "${PUBLIC_URL}", which is not a bare origin.`,
+    "Use exactly: https://<your-host>   (no trailing slash, no path)",
+  ]);
 }
 
 const MCP_PATH = "/mcp";
@@ -217,11 +252,23 @@ app.delete(MCP_PATH, async (req, res) => {
   res.status(200).json({ status: "closed" });
 });
 
-app.listen(Number(PORT), () => {
-  console.log(`Dotloop MCP server on port ${PORT} (${OAUTH_MODE ? "OAuth" : "single-account"} mode)`);
+// Bind on all interfaces explicitly; hosts route to the container's external IP.
+const server = app.listen(Number(PORT), "0.0.0.0", () => {
+  console.log(`Dotloop MCP server listening on 0.0.0.0:${PORT} (${OAUTH_MODE ? "OAuth" : "single-account"} mode)`);
   if (OAUTH_MODE) {
-    console.log(`Connector URL for agents:  ${PUBLIC_URL.replace(/\/$/, "")}${MCP_PATH}`);
+    console.log(`Connector URL for agents:  ${oauth.resourceUrl}`);
     console.log(`Add this to your Dotloop client's Redirect URLs:`);
     console.log(`  ${oauth.dotloopRedirect}`);
+    console.log(`Grant store: ${STORE_PATH}`);
   }
+});
+
+server.on("error", (err) => {
+  process.stderr.write(`\nFailed to bind port ${PORT}: ${err.message}\n`);
+  process.exit(1);
+});
+
+// An unhandled rejection would otherwise kill the process with no explanation.
+process.on("unhandledRejection", (err) => {
+  process.stderr.write(`\nUnhandled rejection: ${err?.stack ?? err}\n`);
 });
