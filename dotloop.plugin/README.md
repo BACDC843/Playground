@@ -219,15 +219,19 @@ structured fields — price, closing date, inspection deadline, earnest money,
 commission. That answers most questions without opening a file. Download PDFs
 only when you need language that isn't a form field.
 
-**Document downloads need a grant from Dotloop.** Tested against a live
-account: listing documents and reading their metadata work, but requesting the
-content returns `403 FORBIDDEN` on every document, folder, and response mode.
-That is a permission Dotloop applies to the API client on their side, not a
-problem with the request — their onboarding email offers to "apply any
-additional permissions if applicable," and this is one of them. Ask your
-Partner Success Manager to enable document content access.
+**Document downloads need the `document:read` scope.** Dotloop grants it per
+API client on their side; ask your Partner Success Manager to enable document
+downloads. The request itself is per their spec — `GET .../document/:id` with
+`Accept: application/pdf`, which returns `Content-Type: application/pdf` and a
+`Content-Disposition` filename.
 
-The tool reports this case with that explanation rather than a raw 403.
+**After the grant, every connected user must reconnect.** A token issued
+before the scope was enabled does not carry it, and refreshing that token will
+not add it — the connector has to run a fresh Dotloop login. Remove and re-add
+the connector, then approve again. Without this step downloads keep returning
+403 even though the grant is in place.
+
+The tool reports both cases with that distinction rather than a raw 403.
 
 **Writes are real.** Update, create, and delete tools modify live transaction
 records. `dotloop_remove_participant` and `dotloop_delete_contact` cannot be

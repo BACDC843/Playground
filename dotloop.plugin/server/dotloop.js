@@ -643,14 +643,16 @@ export function makeCallTool(dotloopFetch, { downloadDir = tmpdir() } = {}) {
           if (/\b403\b/.test(err.message)) {
             throw new Error(
               "Dotloop denied access to this document's content (403).\n\n" +
-                "Listing documents and reading their metadata works, so this is a " +
-                "permission on document downloads rather than a problem with the " +
-                "request. Dotloop applies that grant on their side — ask your " +
-                "Partner Success Manager to enable document content access for " +
-                "this API client.\n\n" +
-                "Until then, use dotloop_get_loop_detail for contract terms " +
-                "(price, dates, commission, earnest money) and " +
-                "dotloop_list_documents to see what paperwork exists."
+                "Downloads need the document:read scope, which Dotloop grants on " +
+                "their side per API client.\n\n" +
+                "If it was NOT granted yet: ask your Partner Success Manager to " +
+                "enable document downloads for this client.\n\n" +
+                "If it WAS just granted: reconnect. A token issued before the " +
+                "grant does not carry the new scope, and refreshing it will not " +
+                "add one — the connector has to run a fresh Dotloop login. Remove " +
+                "and re-add the connector, then approve again.\n\n" +
+                "Meanwhile dotloop_get_loop_detail still returns contract terms " +
+                "and dotloop_list_documents still shows what paperwork exists."
             );
           }
           throw err;
