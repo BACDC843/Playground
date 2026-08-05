@@ -101,6 +101,22 @@ if (profileId) {
     for (const l of list) {
       console.log(`        - ${l.id}  ${l.name}  [${l.status ?? "?"}]`);
     }
+
+    // The account that owns the API client is usually a dedicated, empty one.
+    // Reaching real transactions means authorizing as the agent who owns them.
+    if (list.length === 0) {
+      console.log(
+        `\n  NOTE  The connection works, but this account has no loops.\n` +
+          `        A dedicated API account (api@yourdomain.com) houses the\n` +
+          `        Application Client — it does not hold transactions.\n\n` +
+          `        To reach an agent's loops, rerun \`npm run get-token\` and log in\n` +
+          `        as that agent at the Dotloop approval screen. Same Client ID and\n` +
+          `        Secret; the refresh token is what decides whose data you see.\n\n` +
+          `        Log out of Dotloop in your browser first, or use a private window —\n` +
+          `        an existing session can skip the login prompt and silently reuse\n` +
+          `        the account you are already signed into.`
+      );
+    }
   } catch (err) {
     fail(`GET /profile/${profileId}/loop`, err);
   }
