@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "dotloop": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.js"],
+      "env": {
+        "DOTLOOP_CLIENT_ID": "${DOTLOOP_CLIENT_ID}",
+        "DOTLOOP_CLIENT_SECRET": "${DOTLOOP_CLIENT_SECRET}",
+        "DOTLOOP_REFRESH_TOKEN": "${DOTLOOP_REFRESH_TOKEN}",
+        "DOTLOOP_DOWNLOAD_DIR": "${DOTLOOP_DOWNLOAD_DIR}"
+      },
+      "envFile": "${CLAUDE_PLUGIN_ROOT}/server/.env"
+    }
+  }
+}

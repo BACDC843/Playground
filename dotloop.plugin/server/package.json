@@ -1,0 +1,21 @@
+{
+  "name": "dotloop-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server exposing the Dotloop Public API v2 — loops, contract details, documents, participants, tasks, and contacts",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node http-server.js",
+    "start:stdio": "node index.js",
+    "dev": "node --watch http-server.js",
+    "get-token": "node get-refresh-token.js",
+    "smoke": "node smoke-test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "express": "^5.2.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
