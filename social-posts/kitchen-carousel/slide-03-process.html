@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1080px; height: 1080px; overflow: hidden; }
+</style>
+</head>
+<body>
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#c9a84c"/>
+      <stop offset="100%" style="stop-color:#e8c96d"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1080" height="6" fill="url(#gold)"/>
+  <rect x="0" y="1074" width="1080" height="6" fill="url(#gold)"/>
+
+  <!-- Subtle background pattern -->
+  <line x1="0" y1="360" x2="1080" y2="360" stroke="#c9a84c" stroke-width="0.3" stroke-opacity="0.15"/>
+  <line x1="0" y1="720" x2="1080" y2="720" stroke="#c9a84c" stroke-width="0.3" stroke-opacity="0.15"/>
+  <line x1="360" y1="0" x2="360" y2="1080" stroke="#c9a84c" stroke-width="0.3" stroke-opacity="0.15"/>
+  <line x1="720" y1="0" x2="720" y2="1080" stroke="#c9a84c" stroke-width="0.3" stroke-opacity="0.15"/>
+
+  <!-- Brand -->
+  <text x="54" y="60" font-family="'Georgia', serif" font-size="22" fill="#ffffff" letter-spacing="3">RENEW</text>
+  <text x="122" y="60" font-family="'Georgia', serif" font-size="22" fill="#c9a84c" letter-spacing="3"> URBAN</text>
+  <rect x="54" y="65" width="120" height="1.5" fill="#c9a84c"/>
+  <text x="54" y="112" font-family="'Arial', sans-serif" font-size="13" fill="#c9a84c" letter-spacing="4" font-weight="300">03 / 05</text>
+
+  <!-- Header -->
+  <text x="540" y="185" font-family="'Georgia', serif" font-size="54" fill="#ffffff" text-anchor="middle" font-weight="400">OUR PROCESS</text>
+  <text x="540" y="235" font-family="'Arial', sans-serif" font-size="16" fill="#c9a84c" text-anchor="middle" letter-spacing="5" font-weight="300">FROM VISION TO REALITY</text>
+  <rect x="440" y="252" width="200" height="2" fill="url(#gold)"/>
+
+  <!-- Timeline connector line -->
+  <line x1="540" y1="310" x2="540" y2="900" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.3" stroke-dasharray="6,6"/>
+
+  <!-- Step 1 — CONSULTATION -->
+  <circle cx="540" cy="340" r="32" fill="#1a1a2e" stroke="#c9a84c" stroke-width="2"/>
+  <text x="540" y="347" font-family="'Georgia', serif" font-size="24" fill="#c9a84c" text-anchor="middle">1</text>
+
+  <!-- Step 1 left -->
+  <rect x="80" y="300" width="400" height="80" fill="#22223a" rx="6"/>
+  <rect x="80" y="300" width="4" height="80" fill="#c9a84c" rx="2"/>
+  <text x="104" y="332" font-family="'Georgia', serif" font-size="22" fill="#ffffff">Free Consultation</text>
+  <text x="104" y="358" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">We listen, measure &amp; assess your space</text>
+  <text x="104" y="374" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">with zero pressure or obligation</text>
+  <!-- Arrow to center -->
+  <line x1="484" y1="340" x2="510" y2="340" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.6"/>
+  <polygon points="510,335 520,340 510,345" fill="#c9a84c" fill-opacity="0.6"/>
+
+  <!-- Step 2 — DESIGN -->
+  <circle cx="540" cy="490" r="32" fill="#1a1a2e" stroke="#c9a84c" stroke-width="2"/>
+  <text x="540" y="497" font-family="'Georgia', serif" font-size="24" fill="#c9a84c" text-anchor="middle">2</text>
+
+  <!-- Step 2 right -->
+  <rect x="600" y="450" width="400" height="80" fill="#22223a" rx="6"/>
+  <rect x="996" y="450" width="4" height="80" fill="#c9a84c" rx="2"/>
+  <!-- Arrow from center -->
+  <line x1="572" y1="490" x2="596" y2="490" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.6"/>
+  <polygon points="594,485 604,490 594,495" fill="#c9a84c" fill-opacity="0.6"/>
+  <text x="624" y="482" font-family="'Georgia', serif" font-size="22" fill="#ffffff">Custom Design</text>
+  <text x="624" y="508" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">3D rendering &amp; material selection</text>
+  <text x="624" y="524" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">until every detail feels right</text>
+
+  <!-- Step 3 — BUILD -->
+  <circle cx="540" cy="640" r="32" fill="#1a1a2e" stroke="#c9a84c" stroke-width="2"/>
+  <text x="540" y="647" font-family="'Georgia', serif" font-size="24" fill="#c9a84c" text-anchor="middle">3</text>
+
+  <rect x="80" y="600" width="400" height="80" fill="#22223a" rx="6"/>
+  <rect x="80" y="600" width="4" height="80" fill="#c9a84c" rx="2"/>
+  <line x1="484" y1="640" x2="510" y2="640" stroke="#c9a84c" stroke-width="1.5" stroke-opacity="0.6"/>
+  <polygon points="510,635 520,640 510,645" fill="#c9a84c" fill-opacity="0.6"/>
+  <text x="104" y="632" font-family="'Georgia', serif" font-size="22" fill="#ffffff">Expert Installation</text>
+  <text x="104" y="658" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">Our licensed crew builds with precision</text>
+  <text x="104" y="674" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">— on time, on budget</text>
+
+  <!-- Step 4 — REVEAL -->
+  <circle cx="540" cy="790" r="32" fill="#c9a84c"/>
+  <text x="540" y="797" font-family="'Georgia', serif" font-size="24" fill="#1a1a2e" text-anchor="middle" font-weight="700">4</text>
+
+  <rect x="600" y="750" width="400" height="80" fill="#2a2a45" rx="6"/>
+  <rect x="996" y="750" width="4" height="80" fill="#c9a84c" rx="2"/>
+  <line x1="572" y1="790" x2="596" y2="790" stroke="#c9a84c" stroke-width="1.5"/>
+  <polygon points="594,785 604,790 594,795" fill="#c9a84c"/>
+  <text x="624" y="782" font-family="'Georgia', serif" font-size="22" fill="#c9a84c">The Big Reveal</text>
+  <text x="624" y="808" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">Walk through your stunning new kitchen</text>
+  <text x="624" y="824" font-family="'Arial', sans-serif" font-size="14" fill="#9999bb">— we're not done until you love it</text>
+
+  <!-- Timeline end dot -->
+  <circle cx="540" cy="900" r="8" fill="#c9a84c" fill-opacity="0.4"/>
+  <circle cx="540" cy="900" r="4" fill="#c9a84c"/>
+
+  <!-- Bottom swipe -->
+  <text x="880" y="1050" font-family="'Arial', sans-serif" font-size="13" fill="#c9a84c" letter-spacing="2" text-anchor="middle" font-weight="300">SWIPE →</text>
+</svg>
+</body>
+</html>

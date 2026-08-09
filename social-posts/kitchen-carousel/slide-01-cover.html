@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1080px; height: 1080px; overflow: hidden; font-family: 'Georgia', serif; }
+</style>
+</head>
+<body>
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#c9a84c"/>
+      <stop offset="100%" style="stop-color:#e8c96d"/>
+    </linearGradient>
+    <linearGradient id="overlay" x1="0%" y1="60%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:0"/>
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:0.95"/>
+    </linearGradient>
+    <clipPath id="hexClip">
+      <polygon points="540,80 820,220 820,860 540,1000 260,860 260,220"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+
+  <!-- Decorative grid lines -->
+  <line x1="0" y1="200" x2="1080" y2="200" stroke="#c9a84c" stroke-width="0.5" stroke-opacity="0.2"/>
+  <line x1="0" y1="880" x2="1080" y2="880" stroke="#c9a84c" stroke-width="0.5" stroke-opacity="0.2"/>
+  <line x1="200" y1="0" x2="200" y2="1080" stroke="#c9a84c" stroke-width="0.5" stroke-opacity="0.2"/>
+  <line x1="880" y1="0" x2="880" y2="1080" stroke="#c9a84c" stroke-width="0.5" stroke-opacity="0.2"/>
+
+  <!-- Kitchen illustration — modern island + cabinets -->
+  <!-- Floor -->
+  <rect x="160" y="680" width="760" height="200" fill="#0f0f1a" rx="4"/>
+  <!-- Floor tiles -->
+  <line x1="160" y1="730" x2="920" y2="730" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="160" y1="780" x2="920" y2="780" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="160" y1="830" x2="920" y2="830" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="280" y1="680" x2="280" y2="880" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="400" y1="680" x2="400" y2="880" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="520" y1="680" x2="520" y2="880" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="640" y1="680" x2="640" y2="880" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="760" y1="680" x2="760" y2="880" stroke="#1e1e35" stroke-width="1.5"/>
+  <line x1="880" y1="680" x2="880" y2="880" stroke="#1e1e35" stroke-width="1.5"/>
+
+  <!-- Back wall -->
+  <rect x="160" y="300" width="760" height="380" fill="#12122a"/>
+
+  <!-- Upper cabinets -->
+  <rect x="160" y="300" width="200" height="150" fill="#22223a" rx="2"/>
+  <rect x="370" y="300" width="200" height="150" fill="#22223a" rx="2"/>
+  <rect x="720" y="300" width="200" height="150" fill="#22223a" rx="2"/>
+  <!-- Cabinet doors -->
+  <rect x="170" y="310" width="85" height="130" fill="#2a2a45" rx="1"/>
+  <rect x="265" y="310" width="85" height="130" fill="#2a2a45" rx="1"/>
+  <rect x="380" y="310" width="85" height="130" fill="#2a2a45" rx="1"/>
+  <rect x="475" y="310" width="85" height="130" fill="#2a2a45" rx="1"/>
+  <rect x="730" y="310" width="85" height="130" fill="#2a2a45" rx="1"/>
+  <rect x="825" y="310" width="85" height="130" fill="#2a2a45" rx="1"/>
+  <!-- Cabinet handles -->
+  <line x1="208" y1="375" x2="228" y2="375" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="303" y1="375" x2="323" y2="375" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="418" y1="375" x2="438" y2="375" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="513" y1="375" x2="533" y2="375" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="768" y1="375" x2="788" y2="375" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="863" y1="375" x2="883" y2="375" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Range hood -->
+  <polygon points="480,300 600,300 580,450 500,450" fill="#1a1a32"/>
+  <rect x="490" y="295" width="100" height="10" fill="#c9a84c" rx="2"/>
+
+  <!-- Cooktop -->
+  <rect x="460" y="445" width="160" height="90" fill="#1e1e38" rx="4"/>
+  <circle cx="490" cy="470" r="18" fill="none" stroke="#333355" stroke-width="3"/>
+  <circle cx="490" cy="470" r="10" fill="none" stroke="#444466" stroke-width="2"/>
+  <circle cx="550" cy="470" r="18" fill="none" stroke="#333355" stroke-width="3"/>
+  <circle cx="550" cy="470" r="10" fill="none" stroke="#444466" stroke-width="2"/>
+  <circle cx="490" cy="510" r="18" fill="none" stroke="#333355" stroke-width="3"/>
+  <circle cx="490" cy="510" r="10" fill="none" stroke="#444466" stroke-width="2"/>
+  <circle cx="550" cy="510" r="18" fill="none" stroke="#333355" stroke-width="3"/>
+  <circle cx="550" cy="510" r="10" fill="none" stroke="#444466" stroke-width="2"/>
+
+  <!-- Countertop -->
+  <rect x="160" y="535" width="760" height="20" fill="#2d2d50" rx="2"/>
+  <rect x="160" y="535" width="760" height="4" fill="#c9a84c" fill-opacity="0.4" rx="2"/>
+
+  <!-- Lower cabinets -->
+  <rect x="160" y="555" width="300" height="130" fill="#22223a" rx="2"/>
+  <rect x="620" y="555" width="300" height="130" fill="#22223a" rx="2"/>
+  <!-- Lower doors -->
+  <rect x="170" y="565" width="130" height="110" fill="#2a2a45" rx="1"/>
+  <rect x="310" y="565" width="130" height="110" fill="#2a2a45" rx="1"/>
+  <rect x="630" y="565" width="130" height="110" fill="#2a2a45" rx="1"/>
+  <rect x="770" y="565" width="130" height="110" fill="#2a2a45" rx="1"/>
+  <!-- Lower handles -->
+  <line x1="224" y1="617" x2="244" y2="617" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="364" y1="617" x2="384" y2="617" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="684" y1="617" x2="704" y2="617" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+  <line x1="824" y1="617" x2="844" y2="617" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Kitchen island -->
+  <rect x="330" y="640" width="420" height="40" fill="#c9a84c" rx="2" fill-opacity="0.15"/>
+  <rect x="330" y="640" width="420" height="6" fill="#c9a84c" fill-opacity="0.6" rx="2"/>
+  <rect x="340" y="646" width="400" height="34" fill="#1e1e38" rx="1"/>
+  <!-- Island stools -->
+  <ellipse cx="400" cy="695" rx="25" ry="8" fill="#2a2a45"/>
+  <rect x="395" y="668" width="10" height="27" fill="#333355"/>
+  <ellipse cx="540" cy="695" rx="25" ry="8" fill="#2a2a45"/>
+  <rect x="535" y="668" width="10" height="27" fill="#333355"/>
+  <ellipse cx="680" cy="695" rx="25" ry="8" fill="#2a2a45"/>
+  <rect x="675" y="668" width="10" height="27" fill="#333355"/>
+
+  <!-- Pendant lights -->
+  <line x1="400" y1="200" x2="400" y2="290" stroke="#c9a84c" stroke-width="1.5"/>
+  <ellipse cx="400" cy="295" rx="20" ry="12" fill="#2a2a45" stroke="#c9a84c" stroke-width="1.5"/>
+  <ellipse cx="400" cy="290" rx="8" ry="5" fill="#e8c96d" fill-opacity="0.8"/>
+  <line x1="540" y1="200" x2="540" y2="280" stroke="#c9a84c" stroke-width="1.5"/>
+  <ellipse cx="540" cy="285" rx="20" ry="12" fill="#2a2a45" stroke="#c9a84c" stroke-width="1.5"/>
+  <ellipse cx="540" cy="280" rx="8" ry="5" fill="#e8c96d" fill-opacity="0.8"/>
+  <line x1="680" y1="200" x2="680" y2="290" stroke="#c9a84c" stroke-width="1.5"/>
+  <ellipse cx="680" cy="295" rx="20" ry="12" fill="#2a2a45" stroke="#c9a84c" stroke-width="1.5"/>
+  <ellipse cx="680" cy="290" rx="8" ry="5" fill="#e8c96d" fill-opacity="0.8"/>
+
+  <!-- Gradient overlay at bottom -->
+  <rect width="1080" height="1080" fill="url(#overlay)"/>
+
+  <!-- Gold accent bar top -->
+  <rect x="0" y="0" width="1080" height="6" fill="url(#accent)"/>
+  <rect x="0" y="1074" width="1080" height="6" fill="url(#accent)"/>
+
+  <!-- Text content -->
+  <!-- Slide number -->
+  <text x="54" y="112" font-family="'Arial', sans-serif" font-size="13" fill="#c9a84c" letter-spacing="4" font-weight="300">01 / 05</text>
+
+  <!-- Main headline -->
+  <text x="54" y="910" font-family="'Georgia', serif" font-size="72" fill="#ffffff" font-weight="400" letter-spacing="-1">KITCHEN</text>
+  <text x="54" y="980" font-family="'Georgia', serif" font-size="72" fill="url(#accent)" font-weight="400" letter-spacing="-1">TRANSFORMATIONS</text>
+
+  <!-- Subhead -->
+  <text x="56" y="840" font-family="'Arial', sans-serif" font-size="18" fill="#c9a84c" letter-spacing="5" font-weight="300">YOUR DREAM KITCHEN AWAITS</text>
+
+  <!-- Logo / Brand -->
+  <text x="54" y="60" font-family="'Georgia', serif" font-size="22" fill="#ffffff" font-weight="400" letter-spacing="3">RENEW</text>
+  <text x="122" y="60" font-family="'Georgia', serif" font-size="22" fill="#c9a84c" font-weight="400" letter-spacing="3"> URBAN</text>
+
+  <!-- Logo underline -->
+  <rect x="54" y="65" width="120" height="1.5" fill="#c9a84c"/>
+
+  <!-- Swipe indicator -->
+  <text x="880" y="1050" font-family="'Arial', sans-serif" font-size="13" fill="#c9a84c" letter-spacing="2" text-anchor="middle" font-weight="300">SWIPE →</text>
+</svg>
+</body>
+</html>
