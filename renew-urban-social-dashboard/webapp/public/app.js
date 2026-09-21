@@ -289,7 +289,16 @@ function imgTag(url, cls, placeholderCls, placeholderEmoji){
     `onerror="this.outerHTML='<div class=&quot;${placeholderCls}&quot;>${placeholderEmoji}</div>'">`;
 }
 
-function chartLabels(vals){ return vals.map(v=>{ const d=new Date(v.end_time); return `${d.getMonth()+1}/${d.getDate()}`; }); }
+// Instagram and Facebook stamp daily insights differently. Instagram's
+// end_time falls on the day the value covers; Facebook's falls on the NEXT day
+// (end of the covered day). Checked against post dates: an IG post's reach
+// spike lands on its own date, an FB post's engagement spike lands a day later.
+// So Facebook values step back one day to line up with Instagram.
+function insightDay(endTime, platform){
+  const d=new Date(new Date(endTime).getTime()-(platform==='fb'?86400000:0));
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+function chartLabels(vals, platform){ return vals.map(v=>insightDay(v.end_time, platform)); }
 
 function dc(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 
@@ -1133,7 +1142,7 @@ function initCharts(t){
     if(rd.length){
       const lbls=chartLabels(rd);
       const fbMap={};
-      fb.engByDay.forEach(v=>{ const d=new Date(v.end_time); fbMap[`${d.getMonth()+1}/${d.getDate()}`]=v.value||0; });
+      fb.engByDay.forEach(v=>{ fbMap[insightDay(v.end_time,'fb')]=v.value||0; });
       charts['c-combo']=new Chart(document.getElementById('c-combo'),{
         type:'line',
         data:{labels:lbls,datasets:[
@@ -1215,7 +1224,7 @@ function initCharts(t){
     if(fb.engByDay.length){
       charts['c-fb-eng']=new Chart(document.getElementById('c-fb-eng'),{
         type:'bar',
-        data:{labels:chartLabels(fb.engByDay),datasets:[{data:fb.engByDay.map(v=>v.value),backgroundColor:fb.engByDay.map(v=>(v.value||0)>=50?'#1877F2':'#93B5F5'),borderRadius:3}]},
+        data:{labels:chartLabels(fb.engByDay,'fb'),datasets:[{data:fb.engByDay.map(v=>v.value),backgroundColor:fb.engByDay.map(v=>(v.value||0)>=50?'#1877F2':'#93B5F5'),borderRadius:3}]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:10}}}}}
       });
     }
@@ -1223,7 +1232,7 @@ function initCharts(t){
     if(fb.viewsByDay.length){
       charts['c-fb-views']=new Chart(document.getElementById('c-fb-views'),{
         type:'line',
-        data:{labels:chartLabels(fb.viewsByDay),datasets:[{data:fb.viewsByDay.map(v=>v.value),borderColor:'#1877F2',backgroundColor:'rgba(24,119,242,.1)',borderWidth:2,pointRadius:2,fill:true,tension:.3}]},
+        data:{labels:chartLabels(fb.viewsByDay,'fb'),datasets:[{data:fb.viewsByDay.map(v=>v.value),borderColor:'#1877F2',backgroundColor:'rgba(24,119,242,.1)',borderWidth:2,pointRadius:2,fill:true,tension:.3}]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#EFE9DE'},ticks:{font:{size:10}}}}}
       });
     }
