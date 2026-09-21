@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { registerApprovals } from './approvals.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -512,6 +513,8 @@ app.get('/api/upcoming', async (req, res) => {
     res.json({ available: false, reason: String(err?.message || err) });
   }
 });
+
+registerApprovals(app);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
