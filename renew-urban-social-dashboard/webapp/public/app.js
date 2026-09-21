@@ -171,6 +171,7 @@ async function loadData(){
 
 // ── Metrics ───────────────────────────────────────────
 function getVals(ins,name){ if(!ins||!ins.data) return []; const it=ins.data.find(d=>d.name===name); return (it&&it.values)||[]; }
+function hasMetric(ins,name){ return !!(ins&&ins.data&&ins.data.some(d=>d.name===name)); }
 function getTotal(ins,name){
   if(!ins||!ins.data) return 0;
   const it=ins.data.find(d=>d.name===name);
@@ -200,8 +201,12 @@ function fbM(){
     totalEng:eng.reduce((a,v)=>a+(v.value||0),0),
     peakEng:Math.max(0,...eng.map(v=>v.value||0)),
     pageViews:views.reduce((a,v)=>a+(v.value||0),0),
-    totalReach:getTotal(s.fbIns,'page_impressions_unique'),
-    newFans:getTotal(s.fbIns,'page_fan_adds'),
+    // Facebook retired page_impressions_unique / page_fan_adds; these are the
+    // replacements. If Meta doesn't return them, the tiles say so instead of 0.
+    totalReach:getTotal(s.fbIns,'page_total_media_view_unique'),
+    reachAvail:hasMetric(s.fbIns,'page_total_media_view_unique'),
+    newFans:getTotal(s.fbIns,'page_daily_follows_unique'),
+    fansAvail:hasMetric(s.fbIns,'page_daily_follows_unique'),
     posts:s.fbPosts.length,
     tl:s.fbPosts.reduce((a,p)=>a+((p.likes&&p.likes.summary&&p.likes.summary.total_count)||0),0),
     tc:s.fbPosts.reduce((a,p)=>a+((p.comments&&p.comments.summary&&p.comments.summary.total_count)||0),0),
@@ -239,8 +244,8 @@ function prevM(){
   const igCm=(sp.igPosts||[]).reduce((a,p)=>a+(p.comments_count||0),0);
   const fbEng=gV(sp.fbIns,'page_post_engagements').reduce((a,v)=>a+(v.value||0),0);
   const fbViews=gV(sp.fbIns,'page_views_total').reduce((a,v)=>a+(v.value||0),0);
-  const fbReach=gT(sp.fbIns,'page_impressions_unique');
-  const fbNewFans=gT(sp.fbIns,'page_fan_adds');
+  const fbReach=gT(sp.fbIns,'page_total_media_view_unique');
+  const fbNewFans=gT(sp.fbIns,'page_daily_follows_unique');
   return {
     igReach:igR, igEng:igLk+igCm, igNewFol:igFc,
     igProfViews:gT(sp.igIns,'profile_views'),
@@ -252,8 +257,11 @@ function prevM(){
   };
 }
 
+// Percent change is meaningless off a tiny base (6 -> 803 reads as +13,283%),
+// so no badge is shown when the previous period had fewer than 10.
+const MOM_MIN_BASE=10;
 function momBadge(curr,prev){
-  if(prev==null||!sp) return '';
+  if(prev==null||!sp||prev<MOM_MIN_BASE) return '';
   const pct=prev===0?(curr>0?100:0):Math.round(((curr-prev)/Math.abs(prev))*100);
   if(Math.abs(pct)<2) return '<span class="mom mom-flat">→ 0%</span>';
   return pct>0?`<span class="mom mom-up">↑ ${pct}%</span>`:`<span class="mom mom-dn">↓ ${Math.abs(pct)}%</span>`;
@@ -262,7 +270,7 @@ function momBadge(curr,prev){
 // Plain-text version of momBadge for use inside prose (the executive summary),
 // where an HTML pill doesn't fit.
 function momPhrase(curr,prev){
-  if(prev==null||!sp) return '';
+  if(prev==null||!sp||prev<MOM_MIN_BASE) return '';
   const pct=prev===0?(curr>0?100:0):Math.round(((curr-prev)/Math.abs(prev))*100);
   if(Math.abs(pct)<2) return ' (flat vs last period)';
   return pct>0?` (up ${pct}% vs last period)`:` (down ${Math.abs(pct)}% vs last period)`;
@@ -574,16 +582,20 @@ function renderTW(ig, fb, opts){
   const tp=top5[0];
   const fCv=ig.totalReach>0?((ig.newFol/ig.totalReach)*100).toFixed(2):0;
   const fbWins=fb.totalEng>ig.totalEng;
-  const ppw=(s.igPosts.length/(view==='week'?1:4.3)).toFixed(1);
+  // Posts per week across the whole selected range (it used to assume every
+  // range was a month, so a year-to-date view showed ~16/week).
+  const rng=customRange||getRange();
+  const rangeWeeks=Math.max(1,(new Date(rng.until+'T12:00:00')-new Date(rng.since+'T12:00:00'))/86400000+1)/7;
+  const ppw=(s.igPosts.length/rangeWeeks).toFixed(1);
   return [
     {t:'gold',i:'🏆',tag:'Top Performer',b:tp?`"${(tp.ig.caption||'').substring(0,55).replace(/\n/g,' ')}…" earned <strong>${tp.score} combined engagements</strong>. ${tp.ig.media_type==='VIDEO'?'Client story videos are your strongest format — they build trust and reach simultaneously.':'Carousel content is leading this period — multi-slide education works for your audience.'}`:'Post more content to identify top performers.'},
     {t:'info',i:'📊',tag:'Engagement Rate',b:`IG engagement rate: <strong>${reachEff}%</strong> (${ig.totalEng} eng / ${ig.totalReach.toLocaleString()} reach). Luxury builder benchmark: 2–4%. FB generated <strong>${fb.totalEng} total engagements</strong> — ${fbWins?'<strong>Facebook is currently your higher-engagement platform.</strong> Don\'t neglect it.':'Instagram is your stronger engagement platform this period.'}`},
     {t:+vAvg>+cAvg?'win':'info',i:'🎬',tag:'Video vs Carousel',b:`Reels average <strong>${vAvg} IG likes</strong> vs ${cAvg} for carousels. ${+vAvg>+cAvg?`Video outperforms carousels by ${Math.round((+vAvg/Math.max(+cAvg,.1)-1)*100)}%. Prioritize Reels — they drive reach and follows.`:'Carousels are outperforming Reels this period. Your audience responds to multi-image content — lean into project showcases and before/afters.'}`},
     {t:ig.webClicks<3?'alert':ig.webClicks<8?'warn':'win',i:'🔗',tag:'Website CTR',b:`<strong>${ig.webClicks} website click${ig.webClicks!==1?'s':''}</strong> from <strong>${ig.profViews} profile views</strong> = ${ctr}% CTR. ${ig.webClicks<5?'<strong>⚠ This is critically low.</strong> Fix immediately: change bio CTA to "DM BUILD for a free consult" and link directly to a consultation booking page — not the homepage.':'Profile-to-site conversion is solid.'}`},
-    {t:ig.newFol<5?'warn':'win',i:'👥',tag:'Follower Growth',b:`<strong>${ig.newFol} new follower${ig.newFol!==1?'s':''}</strong> from ${ig.totalReach.toLocaleString()} accounts reached = ${fCv}% follow rate. Luxury builder avg: 0.5–1%. ${ig.newFol<5?'To grow faster: add a follow CTA in the first 3 seconds of every Reel, engage with comments within the first hour of every post, and use location-specific hashtags.':'Growth is solid — stay consistent.'}`},
+    {t:ig.newFol<5?'warn':'win',i:'👥',tag:'Follower Growth',b:`<strong>${ig.newFol} new follower${ig.newFol!==1?'s':''}</strong> from ${ig.totalReach.toLocaleString()} accounts reached = ${fCv}% follow rate. Luxury builder avg: 0.5–1%. ${ig.newFol<5||+fCv<0.5?'To grow faster: add a follow CTA in the first 3 seconds of every Reel, engage with comments within the first hour of every post, and use location-specific hashtags.':'Growth is solid — stay consistent.'}`},
     {t:+ppw>=3?'win':'warn',i:'📅',tag:'Posting Cadence',b:`${s.igPosts.length} posts this period = <strong>${ppw}/week</strong>. ${+ppw>=3?'Good frequency. The algorithm rewards consistency — posting gaps cause reach drops that take weeks to recover.':'⚠ Target 3–4 posts/week: 1–2 Reels, 1–2 carousels. Even a simple phone photo with a great caption beats going silent.'}`},
     {t:'info',i:'📈',tag:'Platform Comparison',b:`FB: <strong>${fb.totalEng} engagements, ${fb.pageViews} page views</strong>. IG: <strong>${ig.totalEng} engagements, ${ig.totalReach.toLocaleString()} reach</strong>. ${fbWins?'Facebook is your engagement leader right now — your existing audience is active there. Post longer captions and use Facebook-specific features like polls and community posts.':'Instagram is winning on engagement, but FB page views ('+fb.pageViews+') show people are still checking your page.'}`},
-    {t:'gold',i:'🏷️',tag:'Hashtag Strategy',b:`Current strategy: 15–20 hashtags per post. Test cutting to 5–8 hyper-local tags: <em>#CharlestonCustomHome, #KiawahIslandBuilder, #LowcountryLuxury, #CharlestonArchitecture, #SCCustomHomes</em>. Niche hashtags reach actual buyers — broad ones reach other builders who won't hire you.`},
+    {t:'gold',i:'🏷️',tag:'Hashtag Strategy',b:`Use 5–8 hyper-local tags per post instead of long lists: <em>#CharlestonCustomHome, #KiawahIslandBuilder, #LowcountryLuxury, #CharlestonArchitecture, #SCCustomHomes</em>. Niche hashtags reach actual buyers — broad ones reach other builders who won't hire you.`},
     {t:'win',i:'💡',tag:'Action Items',b:`<strong>1.</strong> Fix bio link → direct booking page, change CTA to "DM BUILD." <strong>2.</strong> Film 1 client story Reel/week. <strong>3.</strong> Location-tag every post (Charleston · Kiawah · James Island). <strong>4.</strong> Reply to every comment within 60 min of posting. <strong>5.</strong> Post to both FB and IG within 24hrs of each piece of content.`},
   ].map(tw=>`
     <div class="tw ${tw.t}">
@@ -663,9 +675,9 @@ function renderFB(){
     ${renderLiveBar()}
     <div class="sec">Facebook Performance <span class="pill p-fb">FB</span></div>
     <div class="kg g5">
-      <div class="kpi fbhi">${klbl('Total Reach','Unique people who saw any of your Facebook Page’s posts.')}<div class="kv">${fb.totalReach.toLocaleString()}${momBadge(fb.totalReach,pm&&pm.fbReach)}</div><div class="ks">unique people</div></div>
+      <div class="kpi fbhi">${klbl('Total Reach','Unique people who saw any of your Facebook Page’s posts.')}${fb.reachAvail?`<div class="kv">${fb.totalReach.toLocaleString()}${momBadge(fb.totalReach,pm&&pm.fbReach)}</div><div class="ks">unique people</div>`:'<div class="kv">—</div><div class="ks">not reported by Facebook</div>'}</div>
       <div class="kpi fbhi">${klbl('Total Engagements','Likes, comments, and shares across your Facebook posts.')}<div class="kv">${fb.totalEng.toLocaleString()}${momBadge(fb.totalEng,pm&&pm.fbEng)}</div><div class="ks">peak day ${fb.peakEng}</div></div>
-      <div class="kpi good">${klbl('New Page Likes','Net new people who liked/followed your Facebook Page this period.')}<div class="kv">${fb.newFans}${momBadge(fb.newFans,pm&&pm.fbNewFans)}</div><div class="ks">organic growth</div></div>
+      <div class="kpi good">${klbl('New Page Follows','New people who followed your Facebook Page this period.')}${fb.fansAvail?`<div class="kv">${fb.newFans}${momBadge(fb.newFans,pm&&pm.fbNewFans)}</div><div class="ks">organic growth</div>`:'<div class="kv">—</div><div class="ks">not reported by Facebook</div>'}</div>
       <div class="kpi">${klbl('Page Views','Visits to your Facebook Page.')}<div class="kv">${fb.pageViews}${momBadge(fb.pageViews,pm&&pm.fbViews)}</div><div class="ks">total this period</div></div>
       <div class="kpi"><div class="kl">Posts</div><div class="kv">${fb.posts}${momBadge(fb.posts,pm&&pm.fbPosts)}</div><div class="ks">${fb.tl} likes · ${fb.ts} shares</div></div>
     </div>
