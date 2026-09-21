@@ -155,3 +155,19 @@ To use your own domain instead of the railway.app one, add a custom domain
 in the Railway project's Settings tab and follow its DNS instructions (a
 CNAME record pointing a subdomain like `dashboard.yourdomain.com` at
 Railway).
+
+## Post approvals
+
+The **Approvals** tab is where Renew Urban approves each post before it's
+scheduled. Open it directly with `https://renewurban.chsmediagroup.com/?tab=approvals`.
+
+- **Queue:** `server/approvals/queue.json` lists the posts waiting for review.
+  Images go in `public/approvals/<post id>/`. Editing a post in the queue
+  sends it back for review.
+- **Decisions:** stored in Supabase (`ru_post_decisions`), since Render's free
+  plan wipes local files on restart. See `server/approvals.js` for the SQL.
+- **Scheduling:** approving a post schedules it in Blotato (Instagram and
+  Facebook) for its planned time. If it's approved less than 10 minutes
+  before that time, it isn't scheduled and Barry picks a new time.
+- **Access:** reviewers need `REVIEW_PASSCODE`. Five wrong tries locks that
+  IP out for 10 minutes.
