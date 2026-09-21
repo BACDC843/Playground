@@ -37,21 +37,40 @@ const IG_METRICS = [
   { name: 'website_clicks', metric_type: 'total_value' },
   { name: 'accounts_engaged', metric_type: 'total_value' },
 ];
-// page_impressions_unique/page_fan_adds added to give FB the same
-// reach/follower-growth story IG already has (Facebook's API supports both;
-// they just weren't being requested). Each metric is independent per the
-// comment above, so if either of these isn't available for a given Page,
-// it drops out gracefully rather than breaking the rest.
+// Facebook retired page_impressions_unique and page_fan_adds (Graph API now
+// answers "(#100) The value must be a valid insights metric"), which is why
+// FB reach and new likes showed 0. Their replacements are requested instead.
+// If Meta rejects a metric as invalid, it's remembered (see INVALID_METRICS)
+// and not requested again until the server restarts, and the dashboard shows
+// "not reported" instead of a misleading 0.
 const FB_METRICS = [
   { name: 'page_post_engagements' },
   { name: 'page_views_total' },
-  { name: 'page_impressions_unique', metric_type: 'total_value' },
-  { name: 'page_fan_adds', metric_type: 'total_value' },
+  { name: 'page_total_media_view_unique', metric_type: 'total_value' }, // replaces page_impressions_unique (reach)
+  { name: 'page_daily_follows_unique' },                                // replaces page_fan_adds (new follows)
 ];
+const INVALID_METRICS = new Set();
 
 const TIMEOUT_MS = 15000;
 
-async function graphFetch(url) {
+// The dashboard fires dozens of Graph API calls at once (every metric x every
+// 30-day chunk, for this period and the comparison period). On a cold start
+// that burst regularly produced "fetch failed" network errors, which is what
+// the "Partial data this refresh" warning was. Two fixes: cap how many calls
+// run at the same time, and retry network-level failures (not Graph API
+// errors like invalid metrics, which would fail again) with a short backoff.
+const MAX_CONCURRENT = 6;
+let active = 0;
+const waiting = [];
+async function withSlot(fn) {
+  if (active >= MAX_CONCURRENT) await new Promise((r) => waiting.push(r));
+  active++;
+  try { return await fn(); } finally { active--; const next = waiting.shift(); if (next) next(); }
+}
+
+class GraphError extends Error {}
+
+async function graphFetchOnce(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -59,12 +78,28 @@ async function graphFetch(url) {
     const body = await resp.json().catch(() => null);
     if (!resp.ok) {
       const msg = body?.error?.message || `Graph API ${resp.status}`;
-      throw new Error(msg);
+      // 5xx and rate limits are worth retrying; other API errors are not.
+      if (resp.status >= 500 || resp.status === 429) throw new Error(msg);
+      throw new GraphError(msg);
     }
     return body;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function graphFetch(url) {
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await withSlot(() => graphFetchOnce(url));
+    } catch (err) {
+      lastErr = err;
+      if (err instanceof GraphError) throw err;
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1) + Math.random() * 300));
+    }
+  }
+  throw lastErr;
 }
 
 async function graphGet(path, params) {
@@ -167,6 +202,14 @@ function chunkDateRange(since, until, maxDays) {
 // follower_count's extra "trailing 30 days only" rule rejecting an older
 // chunk) just drops that chunk instead of losing the whole metric.
 async function fetchMetricChunked(id, metric, since, until) {
+  if (INVALID_METRICS.has(metric.name)) throw new Error(`${metric.name} is no longer offered by Meta`);
+  // follower_count only exists for the last 30 days (excluding today), so
+  // don't ask for older chunks that are guaranteed to fail.
+  if (metric.name === 'follower_count') {
+    const earliest = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+    if (until < earliest) throw new Error('follower_count only covers the last 30 days');
+    if (since < earliest) since = earliest;
+  }
   const chunks = chunkDateRange(since, until, MAX_INSIGHTS_SPAN_DAYS);
   const results = await Promise.allSettled(chunks.map((c) =>
     graphGet(`${id}/insights`, {
@@ -190,6 +233,7 @@ async function fetchMetricChunked(id, metric, since, until) {
     if (item.values) merged.values = (merged.values || []).concat(item.values);
     if (item.total_value) merged.total_value = { value: (merged.total_value?.value || 0) + (item.total_value.value || 0) };
   });
+  if (failures.some((f) => f.includes('valid insights metric'))) INVALID_METRICS.add(metric.name);
   if (failures.length) console.warn(`[${metric.name}] some date ranges unavailable -- ${failures.join(' | ')}`);
   if (!merged) throw new Error(failures[0] || 'no data returned');
   return merged;
@@ -292,9 +336,9 @@ async function getMonthRollup(range) {
     igReach: metricTotal(ig, 'reach'),
     igAccsEng: metricTotal(ig, 'accounts_engaged'),
     igNewFollowers: metricTotal(ig, 'follower_count'),
-    fbReach: metricTotal(fb, 'page_impressions_unique'),
+    fbReach: metricTotal(fb, 'page_total_media_view_unique'),
     fbEng: metricTotal(fb, 'page_post_engagements'),
-    fbNewFans: metricTotal(fb, 'page_fan_adds'),
+    fbNewFans: metricTotal(fb, 'page_daily_follows_unique'),
   };
 }
 
