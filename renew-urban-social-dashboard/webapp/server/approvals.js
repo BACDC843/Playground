@@ -24,6 +24,9 @@
 //   BLOTATO_FB_ACCOUNT_ID      Blotato account id that owns the FB page (default 42817)
 //   META_FB_PAGE_ID            already set; the Renew Urban Facebook page
 //   PUBLIC_BASE_URL            where images are served from (default https://renewurban.chsmediagroup.com)
+//   RESEND_API_KEY             optional; emails NOTIFY_EMAIL on every decision
+//   NOTIFY_EMAIL               who gets the emails (default barry@chsmediagroup.com)
+//   NOTIFY_FROM                sender (default Renew Urban Approvals <onboarding@resend.dev>)
 
 // Supabase table (run once in the SQL editor):
 //
@@ -69,6 +72,9 @@ function cfg() {
     fbAccountId: env('BLOTATO_FB_ACCOUNT_ID', '42817'),
     fbPageId: env('META_FB_PAGE_ID', '227517480778696'),
     publicBase: env('PUBLIC_BASE_URL', 'https://renewurban.chsmediagroup.com').replace(/\/+$/, ''),
+    resendKey: env('RESEND_API_KEY'),
+    notifyTo: env('NOTIFY_EMAIL', 'barry@chsmediagroup.com'),
+    notifyFrom: env('NOTIFY_FROM', 'Renew Urban Approvals <onboarding@resend.dev>'),
   };
 }
 
@@ -181,6 +187,55 @@ async function schedulePost(post) {
   return { results, errors };
 }
 
+// ── Email notification (Resend) ─────────────────────────────────────────────
+// Emails Barry every time a post is approved or sent back. Optional: without
+// RESEND_API_KEY it does nothing. With Resend's default sender
+// (onboarding@resend.dev) mail can only go to the address the Resend account
+// was created with, so sign up with the NOTIFY_EMAIL address.
+const escHtml = (t) => String(t ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+function scheduleText(row, post) {
+  const when = new Date(post.plannedAt).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET';
+  switch (row.schedule_state) {
+    case 'scheduled': return `Scheduled in Blotato for ${when} (Instagram and Facebook).`;
+    case 'partial': return `Only partly scheduled -- check Blotato. ${row.schedule_error || ''}`;
+    case 'failed': return `NOT scheduled -- Blotato returned an error: ${row.schedule_error || 'unknown'}. Schedule it manually.`;
+    case 'needs_new_time': return `NOT scheduled -- approved after its planned time (${when}). Pick a new time.`;
+    case 'manual': return 'Automatic scheduling is off. Schedule it in Blotato.';
+    default: return '';
+  }
+}
+
+async function notifyDecision(post, row) {
+  const c = cfg();
+  if (!c.resendKey || !c.notifyTo) return false;
+  const approved = row.status === 'approved';
+  const subject = approved
+    ? `${row.reviewer_name} approved: ${post.title}`
+    : `${row.reviewer_name} requested changes: ${post.title}`;
+  const lines = [
+    `<p><b>${escHtml(row.reviewer_name)}</b> ${approved ? 'approved' : 'requested changes to'} <b>${escHtml(post.title)}</b>.</p>`,
+    row.notes ? `<p><b>Notes:</b><br>${escHtml(row.notes).replace(/\n/g, '<br>')}</p>` : '',
+    approved ? `<p>${escHtml(scheduleText(row, post))}</p>` : '<p>Once it\'s revised and redeployed, it goes back to Waiting for another review.</p>',
+    `<p><a href="${c.publicBase}/?tab=approvals">Open the Approvals tab</a></p>`,
+  ];
+  try {
+    const resp = await fetch(`${env('RESEND_API_BASE', 'https://api.resend.com')}/emails`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${c.resendKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: c.notifyFrom, to: [c.notifyTo], subject, html: lines.join('') }),
+    });
+    if (!resp.ok) {
+      console.error(`[approvals] notification email failed: ${resp.status} ${(await resp.text()).slice(0, 200)}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[approvals] notification email failed:', err.message);
+    return false;
+  }
+}
+
 // ── Auth ────────────────────────────────────────────────────────────────────
 const failedAttempts = new Map(); // ip -> { count, until }
 
@@ -264,6 +319,17 @@ export function registerApprovals(app) {
     } catch (err) {
       res.status(502).json({ ok: false });
     }
+  });
+
+  // Sends a test notification so email can be checked without touching a real post.
+  router.post('/test-notify', async (req, res) => {
+    if (!checkPasscode(req, res)) return;
+    if (!cfg().resendKey) { res.status(503).json({ ok: false, error: 'RESEND_API_KEY not set' }); return; }
+    const ok = await notifyDecision(
+      { title: 'Test post (ignore)', plannedAt: new Date(Date.now() + 86400000).toISOString() },
+      { status: 'approved', reviewer_name: 'Test', notes: 'This is a test of approval notifications.', schedule_state: 'scheduled' },
+    );
+    res.json({ ok });
   });
 
   router.get('/', async (req, res) => {
@@ -357,6 +423,7 @@ export function registerApprovals(app) {
       }
 
       const saved = await upsertDecision(row);
+      notifyDecision(post, saved); // fire and forget; never blocks the reviewer
       res.json({ post: view(post, saved) });
     } catch (err) {
       console.error(`[approvals] ${id}:`, err);
