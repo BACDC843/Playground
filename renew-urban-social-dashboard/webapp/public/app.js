@@ -675,7 +675,7 @@ function renderFB(){
     ${renderLiveBar()}
     <div class="sec">Facebook Performance <span class="pill p-fb">FB</span></div>
     <div class="kg g5">
-      <div class="kpi fbhi">${klbl('Total Reach','Unique people who saw any of your Facebook Page’s posts.')}${fb.reachAvail?`<div class="kv">${fb.totalReach.toLocaleString()}${momBadge(fb.totalReach,pm&&pm.fbReach)}</div><div class="ks">unique people</div>`:'<div class="kv">—</div><div class="ks">not reported by Facebook</div>'}</div>
+      <div class="kpi fbhi">${klbl('Total Reach','People who saw your Facebook Page’s content, counted per day and added up, so someone who saw it on two different days counts twice. Facebook no longer reports a single unique-reach number for a date range.')}${fb.reachAvail?`<div class="kv">${fb.totalReach.toLocaleString()}${momBadge(fb.totalReach,pm&&pm.fbReach)}</div><div class="ks">daily viewers, added up</div>`:'<div class="kv">—</div><div class="ks">not reported by Facebook</div>'}</div>
       <div class="kpi fbhi">${klbl('Total Engagements','Likes, comments, and shares across your Facebook posts.')}<div class="kv">${fb.totalEng.toLocaleString()}${momBadge(fb.totalEng,pm&&pm.fbEng)}</div><div class="ks">peak day ${fb.peakEng}</div></div>
       <div class="kpi good">${klbl('New Page Follows','New people who followed your Facebook Page this period.')}${fb.fansAvail?`<div class="kv">${fb.newFans}${momBadge(fb.newFans,pm&&pm.fbNewFans)}</div><div class="ks">organic growth</div>`:'<div class="kv">—</div><div class="ks">not reported by Facebook</div>'}</div>
       <div class="kpi">${klbl('Page Views','Visits to your Facebook Page.')}<div class="kv">${fb.pageViews}${momBadge(fb.pageViews,pm&&pm.fbViews)}</div><div class="ks">total this period</div></div>
