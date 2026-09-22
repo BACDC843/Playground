@@ -1,8 +1,10 @@
 // ── Post approvals ─────────────────────────────────────────────────────────
 // Renew Urban reviews every post before it goes out. The flow:
 //
-//   1. CMG adds a post to approvals/queue.json (plus its images under
-//      public/approvals/<post id>/) and deploys.
+//   1. CMG adds a post on the admin page (/admin.html). The post is saved in
+//      Supabase (table ru_post_queue) and its images in Supabase Storage
+//      (bucket ru-approvals), so nothing needs a commit or a redeploy.
+//      approvals/queue.json still works for posts added the old way.
 //   2. Renew Urban opens the Approvals tab, enters the review passcode, and
 //      marks each post Approved or Changes requested (with notes).
 //   3. Decisions are stored in Supabase (table ru_post_decisions) because
@@ -11,11 +13,12 @@
 //      planned time, as long as that time is still in the future. Nothing is
 //      ever scheduled without an approval. No answer means no post.
 //
-// If a post is edited in queue.json after a decision, its content hash
+// If a post is edited (admin page or queue.json) after a decision, its content hash
 // changes and the old decision no longer applies -- it goes back to pending.
 //
 // Env vars (all set in Render, never committed):
 //   REVIEW_PASSCODE            passcode the reviewer types in
+//   ADMIN_PASSCODE             passcode for the admin page (adding/editing posts)
 //   SUPABASE_URL               https://<project>.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY  service role key (server-side only)
 //   BLOTATO_API_KEY            already set for Upcoming Posts
@@ -56,6 +59,11 @@ import express from 'express';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const QUEUE_PATH = path.join(__dirname, 'approvals', 'queue.json');
 const TABLE = 'ru_post_decisions';
+const QUEUE_TABLE = 'ru_post_queue';
+const BUCKET = 'ru-approvals';
+const IG_MAX_HASHTAGS = 5;     // Blotato rejects Instagram posts with more
+const IG_MAX_CAPTION = 2200;
+const IG_MAX_IMAGES = 10;
 const MIN_LEAD_MS = 10 * 60 * 1000; // don't schedule anything less than 10 minutes out
 
 const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d : process.env[k]);
@@ -63,6 +71,7 @@ const env = (k, d) => (process.env[k] === undefined || process.env[k] === '' ? d
 function cfg() {
   return {
     passcode: env('REVIEW_PASSCODE'),
+    adminPasscode: env('ADMIN_PASSCODE'),
     supabaseUrl: (env('SUPABASE_URL') || '').replace(/\/+$/, ''),
     supabaseKey: env('SUPABASE_SERVICE_ROLE_KEY'),
     blotatoKey: env('BLOTATO_API_KEY'),
@@ -79,7 +88,9 @@ function cfg() {
 }
 
 // ── Queue ───────────────────────────────────────────────────────────────────
-async function loadQueue() {
+// Posts come from two places: Supabase (added on the admin page) and the
+// legacy approvals/queue.json. A Supabase post wins if both use the same id.
+async function loadFileQueue() {
   try {
     const raw = await fs.readFile(QUEUE_PATH, 'utf8');
     const body = JSON.parse(raw);
@@ -90,6 +101,46 @@ async function loadQueue() {
   }
 }
 
+async function loadDbQueue() {
+  const c = cfg();
+  if (!c.supabaseUrl || !c.supabaseKey) return [];
+  const rows = await sb('GET', '?select=id,post&active=eq.true', null, {}, QUEUE_TABLE);
+  return (rows || []).map((r) => ({ ...r.post, id: r.id, _source: 'admin' }));
+}
+
+async function loadQueue() {
+  const [file, db] = await Promise.all([loadFileQueue(), loadDbQueue()]);
+  const ids = new Set(db.map((p) => p.id));
+  return [...db, ...file.filter((p) => !ids.has(p.id)).map((p) => ({ ...p, _source: 'file' }))];
+}
+
+// ── Checks ──────────────────────────────────────────────────────────────────
+// Blotato counts every "#word" as a hashtag, including something like "#1"
+// in the middle of a sentence, so this counts the same way.
+export function countHashtags(text) {
+  return (String(text || '').match(/#[\p{L}\p{N}_]+/gu) || []).length;
+}
+
+function checkPost(post) {
+  const errors = [];
+  const warnings = [];
+  if (!String(post.title || '').trim()) errors.push('Add a title.');
+  const planned = new Date(post.plannedAt).getTime();
+  if (!Number.isFinite(planned)) errors.push('Set a planned date and time.');
+  else if (planned - Date.now() < MIN_LEAD_MS) warnings.push('The planned time is less than 10 minutes away or already past. An approval won\'t schedule it.');
+  const images = post.images || [];
+  if (!images.length) errors.push('Add at least one image.');
+  const ig = post.instagram || {};
+  const fb = post.facebook || {};
+  if (!String(ig.caption || '').trim() && !String(fb.caption || '').trim()) errors.push('Write an Instagram or Facebook caption.');
+  if (ig.caption) {
+    const n = countHashtags(ig.caption);
+    if (n > IG_MAX_HASHTAGS) errors.push(`Instagram caption has ${n} hashtags. Instagram allows ${IG_MAX_HASHTAGS} (anything like "#1" counts).`);
+    if (ig.caption.length > IG_MAX_CAPTION) errors.push(`Instagram caption is ${ig.caption.length} characters. The limit is ${IG_MAX_CAPTION}.`);
+    if (images.length > IG_MAX_IMAGES) errors.push(`Instagram carousels take up to ${IG_MAX_IMAGES} images.`);
+  }
+  return { errors, warnings };
+}
 // Hash of everything the reviewer actually approves. Editing any of it
 // invalidates an earlier decision.
 function contentHash(post) {
@@ -103,9 +154,19 @@ function contentHash(post) {
 }
 
 // ── Supabase (PostgREST) ────────────────────────────────────────────────────
-async function sb(method, query, body, extraHeaders = {}) {
+function sbAuthHeaders() {
   const c = cfg();
-  const resp = await fetch(`${c.supabaseUrl}/rest/v1/${TABLE}${query}`, {
+  return {
+    apikey: c.supabaseKey,
+    // Legacy service_role keys are JWTs and go in Authorization too. The
+    // newer sb_secret_ keys aren't JWTs and only belong in apikey.
+    ...(c.supabaseKey?.startsWith('sb_') ? {} : { Authorization: `Bearer ${c.supabaseKey}` }),
+  };
+}
+
+async function sb(method, query, body, extraHeaders = {}, table = TABLE) {
+  const c = cfg();
+  const resp = await fetch(`${c.supabaseUrl}/rest/v1/${table}${query}`, {
     method,
     headers: {
       apikey: c.supabaseKey,
@@ -132,6 +193,55 @@ async function upsertDecision(row) {
     Prefer: 'resolution=merge-duplicates,return=representation',
   });
   return rows?.[0] || row;
+}
+
+async function uploadImage(buffer, contentType, filename) {
+  const c = cfg();
+  const ext = (filename.match(/\.(jpe?g|png|webp)$/i)?.[1] || (contentType.split('/')[1] || 'jpg')).toLowerCase().replace('jpeg', 'jpg');
+  const base = filename.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'image';
+  const key = `${new Date().toISOString().slice(0, 10)}/${crypto.randomBytes(5).toString('hex')}-${base}.${ext}`;
+  const resp = await fetch(`${c.supabaseUrl}/storage/v1/object/${BUCKET}/${key}`, {
+    method: 'POST',
+    headers: { ...sbAuthHeaders(), 'Content-Type': contentType, 'x-upsert': 'false', 'cache-control': '31536000' },
+    body: buffer,
+  });
+  if (!resp.ok) throw new Error(`Image upload failed (${resp.status}): ${(await resp.text()).slice(0, 200)}`);
+  return `${c.supabaseUrl}/storage/v1/object/public/${BUCKET}/${key}`;
+}
+
+function slugify(t) {
+  return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'post';
+}
+
+// Only the fields a post is allowed to have; everything else is dropped.
+function cleanPost(input) {
+  const str = (v, max) => String(v ?? '').replace(/\r\n/g, '\n').slice(0, max);
+  const side = (o, withAlt) => {
+    if (!o || !String(o.caption || '').trim()) return null;
+    const out = { caption: str(o.caption, 5000) };
+    if (String(o.firstComment || '').trim()) out.firstComment = str(o.firstComment, 2000);
+    if (withAlt && String(o.altText || '').trim()) out.altText = str(o.altText, 1000);
+    return out;
+  };
+  const images = (Array.isArray(input.images) ? input.images : [])
+    .map((u) => String(u || '').trim())
+    .filter((u) => /^https:\/\//i.test(u) || u.startsWith('/approvals/') || (cfg().supabaseUrl && u.startsWith(`${cfg().supabaseUrl}/`)))
+    .slice(0, 20);
+  const sources = (Array.isArray(input.sources) ? input.sources : [])
+    .map((x) => ({ name: str(x?.name, 300).trim(), url: str(x?.url, 1000).trim() }))
+    .filter((x) => x.name || x.url)
+    .slice(0, 20);
+  const n = images.length;
+  return {
+    title: str(input.title, 200).trim(),
+    format: str(input.format, 100).trim() || (n > 1 ? `${n}-slide carousel` : 'Single image'),
+    plannedAt: new Date(input.plannedAt).toString() === 'Invalid Date' ? '' : new Date(input.plannedAt).toISOString(),
+    images,
+    instagram: side(input.instagram, true),
+    facebook: side(input.facebook, false),
+    sources,
+    notesForReviewer: str(input.notesForReviewer, 2000).trim(),
+  };
 }
 
 // ── Blotato ─────────────────────────────────────────────────────────────────
@@ -292,6 +402,8 @@ function view(post, d) {
     facebook: post.facebook || null,
     sources: post.sources || [],
     notesForReviewer: post.notesForReviewer || '',
+    source: post._source || 'file',
+    checks: checkPost(post),
     status,
     reviewerName: current ? d.reviewer_name : null,
     reviewerNotes: current ? d.notes : null,
@@ -336,8 +448,11 @@ export function registerApprovals(app) {
     if (!checkPasscode(req, res) || !storageReady(res)) return;
     try {
       const [queue, decisions] = await Promise.all([loadQueue(), getDecisions()]);
+      // Posts that already went out drop off the reviewer's list a day later.
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
       const posts = queue
         .map((p) => view(p, decisions[p.id]))
+        .filter((v) => !(v.status === 'approved' && new Date(v.plannedAt).getTime() < cutoff))
         .sort((a, b) => new Date(a.plannedAt) - new Date(b.plannedAt));
       res.json({ posts, autoSchedule: cfg().autoSchedule && Boolean(cfg().blotatoKey) });
     } catch (err) {
@@ -402,8 +517,12 @@ export function registerApprovals(app) {
       if (decision === 'approved') {
         const c = cfg();
         const planned = new Date(post.plannedAt).getTime();
+        const problems = checkPost(post).errors;
         if (!c.autoSchedule || !c.blotatoKey) {
           row.schedule_state = 'manual';
+        } else if (problems.length) {
+          row.schedule_state = 'failed';
+          row.schedule_error = `Not scheduled: ${problems.join(' ')} Barry will fix it and resend.`;
         } else if (!Number.isFinite(planned) || planned - Date.now() < MIN_LEAD_MS) {
           row.schedule_state = 'needs_new_time';
           row.schedule_error = 'Approved after the planned time. Barry will pick a new time.';
@@ -434,4 +553,125 @@ export function registerApprovals(app) {
   });
 
   app.use('/api/approvals', router);
+  app.use('/api/admin', adminRouter());
+}
+
+// ── Admin (CMG only) ────────────────────────────────────────────────────────
+function checkAdmin(req, res) {
+  const c = cfg();
+  if (!c.adminPasscode) {
+    res.status(503).json({ error: 'The admin page is not set up yet (ADMIN_PASSCODE missing).' });
+    return false;
+  }
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+  const key = `admin:${ip}`;
+  const f = failedAttempts.get(key);
+  if (f && f.until > Date.now()) {
+    res.status(429).json({ error: 'Too many wrong passcodes. Try again in a few minutes.' });
+    return false;
+  }
+  const given = Buffer.from(String(req.get('x-admin-passcode') || ''));
+  const want = Buffer.from(c.adminPasscode);
+  if (!(given.length === want.length && crypto.timingSafeEqual(given, want))) {
+    const count = (f?.count || 0) + 1;
+    failedAttempts.set(key, { count, until: count >= 5 ? Date.now() + 10 * 60 * 1000 : 0 });
+    res.status(401).json({ error: 'Wrong passcode.' });
+    return false;
+  }
+  failedAttempts.delete(key);
+  return true;
+}
+
+function adminRouter() {
+  const r = express.Router();
+  r.use(express.json({ limit: '20mb' }));
+  r.use((req, res, next) => (checkAdmin(req, res) && storageReady(res) ? next() : undefined));
+
+  r.get('/posts', async (req, res) => {
+    try {
+      const [queue, decisions] = await Promise.all([loadQueue(), getDecisions()]);
+      const posts = queue
+        .map((p) => view(p, decisions[p.id]))
+        .sort((a, b) => new Date(a.plannedAt) - new Date(b.plannedAt));
+      res.json({ posts });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  // One image per request, sent as base64 JSON (keeps the server dependency-free).
+  r.post('/images', async (req, res) => {
+    try {
+      const { filename = 'image.jpg', contentType = '', data = '' } = req.body || {};
+      if (!/^image\/(jpeg|png|webp)$/.test(contentType)) {
+        res.status(400).json({ error: 'Images must be JPG, PNG or WebP.' });
+        return;
+      }
+      const buffer = Buffer.from(String(data), 'base64');
+      if (!buffer.length || buffer.length > 12 * 1024 * 1024) {
+        res.status(400).json({ error: 'Each image must be under 12 MB.' });
+        return;
+      }
+      res.json({ url: await uploadImage(buffer, contentType, String(filename)) });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  // Create (no id) or update (id) a post. Saving any change sends it back to
+  // pending, because the content hash changes.
+  r.post('/posts', async (req, res) => {
+    try {
+      const post = cleanPost(req.body?.post || {});
+      const { errors, warnings } = checkPost(post);
+      if (errors.length) {
+        res.status(400).json({ error: errors.join(' '), errors, warnings });
+        return;
+      }
+      let id = String(req.body?.id || '').trim();
+      const decisions = await getDecisions();
+      if (id) {
+        const d = decisions[id];
+        if (d && d.status === 'approved' && ['scheduled', 'partial'].includes(d.schedule_state)) {
+          res.status(409).json({ error: 'This post is already scheduled in Blotato. Delete it there first, then remove it here and add it again.' });
+          return;
+        }
+      } else {
+        const existing = new Set((await loadQueue()).map((p) => p.id).concat(Object.keys(decisions)));
+        const baseId = `${post.plannedAt.slice(0, 10)}-${slugify(post.title)}`;
+        id = baseId;
+        for (let i = 2; existing.has(id); i++) id = `${baseId}-${i}`;
+      }
+      if (!/^[a-z0-9-]{3,80}$/.test(id)) {
+        res.status(400).json({ error: 'Invalid post id.' });
+        return;
+      }
+      const now = new Date().toISOString();
+      await sb('POST', '?on_conflict=id', { id, post, active: true, updated_at: now }, {
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      }, QUEUE_TABLE);
+      res.json({ id, warnings });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  // Takes a post off the Approvals tab. Kept in the table (active=false) as a record.
+  r.delete('/posts/:id', async (req, res) => {
+    try {
+      const id = req.params.id;
+      const rows = await sb('PATCH', `?id=eq.${encodeURIComponent(id)}`, { active: false, updated_at: new Date().toISOString() }, {
+        Prefer: 'return=representation',
+      }, QUEUE_TABLE);
+      if (!rows?.length) {
+        res.status(404).json({ error: 'Only posts added on this page can be removed here. Posts in queue.json have to be removed in the code.' });
+        return;
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  return r;
 }
