@@ -22,6 +22,8 @@
     const d=new Date(iso); if(isNaN(d)) return 'Time not set';
     return d.toLocaleString('en-US',{timeZone:TZ,weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' ET';
   };
+  // CMG-only entry to the admin page (it has its own passcode).
+  const adminLink='<div class="ap-foot ap-admin"><a class="ap-admin-btn" href="/admin.html">Manage posts (CMG admin) →</a></div>';
   const safeUrl=u=>/^https?:\/\//i.test(u||'')?u:'#';
 
   // Keep the date controls and loading banners out of the way on this tab.
@@ -49,7 +51,7 @@
           <button type="submit" class="ap-btn ap-approve">View posts</button>
         </form>
         ${msg?`<div class="ap-err">${esc(msg)}</div>`:''}
-      </div>`;
+      </div>${adminLink}`;
     document.getElementById('ap-gate-form').addEventListener('submit',e=>{
       e.preventDefault();
       passcode=document.getElementById('ap-pass').value.trim();
@@ -168,7 +170,7 @@
     const order={pending:0,changes_requested:1,approved:2};
     const sorted=posts.slice().sort((a,b)=>(order[a.status]-order[b.status])||(new Date(a.plannedAt)-new Date(b.plannedAt)));
     panel.innerHTML=head+(sorted.length?sorted.map(card).join(''):'<div class="ap-empty">Nothing waiting for approval right now.</div>')
-      +'<div class="ap-foot"><button type="button" class="ap-link" id="ap-signout">Sign out of approvals</button></div>';
+      +'<div class="ap-foot"><button type="button" class="ap-link" id="ap-signout">Sign out of approvals</button></div>'+adminLink;
   }
 
   function rerenderCard(id){
