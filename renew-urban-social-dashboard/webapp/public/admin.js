@@ -73,11 +73,11 @@
   function renderList(flash){
     const rows=posts.map(p=>`
       <div class="ad-list-item">
-        ${p.images[0]?`<img src="${esc(p.images[0])}" alt="">`:'<img alt="">'}
+        ${p.images[0]?`<img src="${esc(p.images[0])}" alt="">`:p.video?'<div class="ad-vthumb">▶ Video</div>':'<img alt="">'}
         <div class="ad-li-main">
           <div class="ad-li-t">${esc(p.title)}</div>
-          <div class="ad-li-s">${esc(fmtWhen(p.plannedAt))} · ${esc(p.format||'')} · ${p.images.length} image${p.images.length===1?'':'s'}${p.source==='file'?' · <em>added in code</em>':''}</div>
-          <div class="ad-li-s">${statusLine(p)}</div>
+          <div class="ad-li-s">${esc(fmtWhen(p.plannedAt))} · ${esc(p.format||'')} · ${p.video?'video':`${p.images.length} image${p.images.length===1?'':'s'}`}${p.source==='file'?' · <em>added in code</em>':''}</div>
+          <div class="ad-li-s">${statusLine(p)}${p.status==='pending'&&p.source==='admin'?(p.submittedAt?` · <span style="color:var(--green)">Sent to Paige &amp; Andy ${esc(fmtWhen(p.submittedAt))}</span>`:' · <strong style="color:var(--amber)">Not sent yet</strong>'):''}</div>
           ${p.status==='changes_requested'&&p.reviewerNotes?`<div class="ad-note"><strong>${esc(p.reviewerName||'Reviewer')}:</strong> ${esc(p.reviewerNotes)}</div>`:''}
           ${p.status==='pending'&&p.previousRound&&p.previousRound.notes?`<div class="ad-note">Last round, ${esc(p.previousRound.reviewerName||'reviewer')} asked: ${esc(p.previousRound.notes)}</div>`:''}
           ${(p.checks&&p.checks.errors.length)?`<div class="ad-msg ad-err">${p.checks.errors.map(esc).join('<br>')}</div>`:''}
@@ -92,12 +92,16 @@
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <div><div class="ad-h">Posts on the Approvals tab</div>
           <div class="ad-sub" style="margin:0">Saving a post sends it to Renew Urban as Pending. When they approve it, it schedules itself in Blotato.</div></div>
-          <button class="ad-btn ad-pri" id="newBtn">+ New post</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="ad-btn ad-sec" id="newBtn">+ New post</button>
+            <button class="ad-btn ad-pri" id="submitBtn" ${posts.some(p=>p.status==='pending'&&!(p.checks&&p.checks.errors.length))?'':'disabled'}>Submit for approval</button>
+          </div>
         </div>
         ${flash?`<div class="ad-msg ${flash.cls}">${esc(flash.text)}</div>`:''}
         <div style="margin-top:10px">${rows||'<p class="ad-sub" style="margin:12px 0 0">Nothing is waiting for review.</p>'}</div>
       </div>`;
     document.getElementById('newBtn').onclick=()=>openForm(null);
+    document.getElementById('submitBtn').onclick=submitForApproval;
     app.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openForm(posts.find(p=>p.id===b.dataset.edit)));
     app.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
       const p=posts.find(x=>x.id===b.dataset.del);
@@ -110,7 +114,7 @@
 
   function openForm(p){
     const et=isoToEt(p&&p.plannedAt);
-    editing={id:p?p.id:null,images:p?[...p.images]:[]};
+    editing={id:p?p.id:null,images:p?[...p.images]:[],video:p&&p.video?{...p.video}:null};
     const ig=(p&&p.instagram)||{}, fb=(p&&p.facebook)||{};
     const src=((p&&p.sources)||[]).map(s=>[s.name,s.url].filter(Boolean).join(' | ')).join('\n');
     app.innerHTML=`
@@ -124,7 +128,12 @@
           <div class="ad-f"><label for="f-time">Post time (Eastern)</label><input id="f-time" type="time" value="${esc(et.time||'10:00')}"></div>
           <div class="ad-f"><label for="f-format">Format (optional)</label><input id="f-format" value="${esc(p?p.format:'')}" placeholder="Filled in from the image count"></div>
         </div>
-        <div class="ad-f"><label>Images, in order</label>
+        <div class="ad-f"><label>Video (for a Reel)</label>
+          <div id="vbox"></div>
+          <div class="ad-drop" id="vdrop">Drop a finished MP4 or MOV here, or click to choose. Vertical 9:16 works best on Instagram.<input id="vfile" type="file" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" class="ad-hidden"></div>
+          <div id="vmsg"></div>
+        </div>
+        <div class="ad-f"><label id="imgLabel">Images, in order</label>
           <div class="ad-imgs" id="imgs"></div>
           <div class="ad-drop" id="drop">Drop JPG or PNG files here, or click to choose. The first image is the cover.<input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple class="ad-hidden"></div>
           <div id="upmsg"></div>
@@ -152,7 +161,13 @@
     $('f-igcap').oninput=meter; meter();
     $('copyBtn').onclick=()=>{ if(!$('f-fbcap').value.trim()||confirm('Replace the Facebook caption?')) $('f-fbcap').value=$('f-igcap').value; };
     $('cancelBtn').onclick=()=>load();
-    renderImgs();
+    renderImgs(); renderVideo();
+    const vdrop=$('vdrop'), vfile=$('vfile');
+    vdrop.onclick=e=>{ if(e.target!==vfile) vfile.click(); };
+    vfile.onchange=()=>{ if(vfile.files[0]) uploadVideo(vfile.files[0]); vfile.value=''; };
+    vdrop.ondragover=e=>{ e.preventDefault(); vdrop.classList.add('over'); };
+    vdrop.ondragleave=()=>vdrop.classList.remove('over');
+    vdrop.ondrop=e=>{ e.preventDefault(); vdrop.classList.remove('over'); const f=e.dataTransfer.files[0]; if(f) uploadVideo(f); };
     const drop=$('drop'), file=$('file');
     drop.onclick=e=>{ if(e.target!==file) file.click(); };
     file.onchange=()=>{ upload([...file.files]); file.value=''; };
@@ -191,6 +206,54 @@
     msg.innerHTML=`<div class="ad-msg ad-ok">Uploaded ${done} image${done===1?'':'s'}.</div>`;
   }
 
+  function renderVideo(){
+    const box=document.getElementById('vbox'), lbl=document.getElementById('imgLabel'); if(!box) return;
+    const v=editing.video;
+    box.innerHTML=v?`<div class="ad-vid"><video src="${esc(v.url)}" controls playsinline preload="metadata"></video>
+      <div class="ad-li-s">${v.width&&v.height?`${v.width}×${v.height}`:''}${v.duration?` · ${v.duration}s`:''}${v.width&&v.height&&Math.abs(v.width/v.height-9/16)>0.02?' · <strong style="color:var(--red)">Not vertical 9:16 — it will be letterboxed on Instagram</strong>':''}</div>
+      <button type="button" class="ad-btn ad-dan" id="vrm" style="padding:4px 12px;font-size:12px;margin-top:6px">Remove video</button></div>`:'';
+    document.getElementById('vdrop').classList.toggle('ad-hidden',!!v);
+    lbl.textContent=v?'Cover image (optional, one image)':'Images, in order';
+    if(v) document.getElementById('vrm').onclick=()=>{ editing.video=null; renderVideo(); };
+  }
+
+  function videoMeta(file){
+    return new Promise(res=>{ const el=document.createElement('video'); el.preload='metadata'; const u=URL.createObjectURL(file);
+      el.onloadedmetadata=()=>{ res({width:el.videoWidth,height:el.videoHeight,duration:Math.round(el.duration)}); URL.revokeObjectURL(u); };
+      el.onerror=()=>{ res({}); URL.revokeObjectURL(u); }; el.src=u; });
+  }
+
+  async function uploadVideo(f){
+    const msg=document.getElementById('vmsg');
+    if(!/\.(mp4|mov|m4v)$/i.test(f.name)){ msg.innerHTML='<div class="ad-msg ad-err">Use an MP4 or MOV file.</div>'; return; }
+    msg.innerHTML=`<div class="ad-msg ad-warn">Preparing upload…</div>`;
+    try{
+      const meta=await videoMeta(f);
+      const {uploadUrl,publicUrl}=await api('/video-upload',{method:'POST',body:JSON.stringify({filename:f.name})});
+      await new Promise((res,rej)=>{
+        const x=new XMLHttpRequest(); x.open('PUT',uploadUrl); x.setRequestHeader('Content-Type',f.type||'video/mp4');
+        x.upload.onprogress=e=>{ if(e.lengthComputable) msg.innerHTML=`<div class="ad-msg ad-warn">Uploading ${esc(f.name)}: ${Math.round(e.loaded/e.total*100)}%</div>`; };
+        x.onload=()=>x.status>=200&&x.status<300?res():rej(new Error('Upload failed ('+x.status+')'));
+        x.onerror=()=>rej(new Error('Upload failed. Check your connection and try again.'));
+        x.send(f);
+      });
+      editing.video={url:publicUrl,...meta};
+      if(editing.images.length>1) editing.images=editing.images.slice(0,1);
+      renderVideo(); renderImgs();
+      msg.innerHTML=`<div class="ad-msg ad-ok">Uploaded ${esc(f.name)} (${(f.size/1048576).toFixed(0)} MB).</div>`;
+    }catch(e){ msg.innerHTML=`<div class="ad-msg ad-err">${esc(e.message)}</div>`; }
+  }
+
+  async function submitForApproval(){
+    const ready=posts.filter(p=>p.status==='pending'&&!(p.checks&&p.checks.errors.length));
+    if(!ready.length) return;
+    const list=ready.map(p=>'• '+p.title+' ('+fmtWhen(p.plannedAt)+')').join('\n');
+    if(!confirm(`Email Paige and Andy to review ${ready.length} post${ready.length===1?'':'s'}?\n\n${list}`)) return;
+    const b=document.getElementById('submitBtn'); b.disabled=true; b.textContent='Sending…';
+    try{ const r=await api('/submit',{method:'POST',body:'{}'}); load({cls:'ad-ok',text:`Sent to ${r.to.join(' and ')}: ${r.sent} post${r.sent===1?'':'s'} waiting for approval.`}); }
+    catch(e){ b.disabled=false; b.textContent='Submit for approval'; load({cls:'ad-err',text:e.message}); }
+  }
+
   async function save(){
     const $=id=>document.getElementById(id), msg=$('formmsg'), btn=$('saveBtn');
     const sources=$('f-src').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
@@ -199,7 +262,7 @@
     const post={
       title:$('f-title').value, format:$('f-format').value,
       plannedAt:etToIso($('f-date').value,$('f-time').value),
-      images:editing.images,
+      images:editing.images, video:editing.video,
       instagram:{caption:$('f-igcap').value,altText:$('f-igalt').value,firstComment:$('f-igfc').value},
       facebook:{caption:$('f-fbcap').value,firstComment:$('f-fbfc').value},
       sources, notesForReviewer:$('f-notes').value,
