@@ -19,6 +19,8 @@
 // Env vars (all set in Render, never committed):
 //   REVIEW_PASSCODE            passcode the reviewer types in
 //   ADMIN_PASSCODE             passcode for the admin page (adding/editing posts)
+//   APPROVER_EMAILS            who gets "Submit for approval" emails (default paige@ and andy@renewurban.net)
+//   NOTIFY_FROM                sender; must be on a domain verified in Resend to email anyone but the Resend account owner
 //   SUPABASE_URL               https://<project>.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY  service role key (server-side only)
 //   BLOTATO_API_KEY            already set for Upcoming Posts
@@ -84,6 +86,8 @@ function cfg() {
     resendKey: env('RESEND_API_KEY'),
     notifyTo: env('NOTIFY_EMAIL', 'barry@chsmediagroup.com'),
     notifyFrom: env('NOTIFY_FROM', 'Renew Urban Approvals <onboarding@resend.dev>'),
+    approverEmails: env('APPROVER_EMAILS', 'paige@renewurban.net,andy@renewurban.net').split(',').map((x) => x.trim()).filter(Boolean),
+    replyTo: env('REPLY_TO_EMAIL', 'barry@chsmediagroup.com'),
   };
 }
 
@@ -104,8 +108,8 @@ async function loadFileQueue() {
 async function loadDbQueue() {
   const c = cfg();
   if (!c.supabaseUrl || !c.supabaseKey) return [];
-  const rows = await sb('GET', '?select=id,post&active=eq.true', null, {}, QUEUE_TABLE);
-  return (rows || []).map((r) => ({ ...r.post, id: r.id, _source: 'admin' }));
+  const rows = await sb('GET', '?select=id,post,submitted_at&active=eq.true', null, {}, QUEUE_TABLE);
+  return (rows || []).map((r) => ({ ...r.post, id: r.id, _source: 'admin', _submittedAt: r.submitted_at || null }));
 }
 
 async function loadQueue() {
@@ -129,7 +133,13 @@ function checkPost(post) {
   if (!Number.isFinite(planned)) errors.push('Set a planned date and time.');
   else if (planned - Date.now() < MIN_LEAD_MS) warnings.push('The planned time is less than 10 minutes away or already past. An approval won\'t schedule it.');
   const images = post.images || [];
-  if (!images.length) errors.push('Add at least one image.');
+  const video = post.video || null;
+  if (!images.length && !video) errors.push('Add at least one image or a video.');
+  if (video && images.length > 1) errors.push('A video post can have one cover image at most.');
+  if (video && video.width && video.height) {
+    const r = video.width / video.height;
+    if (Math.abs(r - 9 / 16) > 0.02) warnings.push(`The video is ${video.width}x${video.height}, not vertical 9:16. Instagram will show it letterboxed as a Reel.`);
+  }
   const ig = post.instagram || {};
   const fb = post.facebook || {};
   if (!String(ig.caption || '').trim() && !String(fb.caption || '').trim()) errors.push('Write an Instagram or Facebook caption.');
@@ -137,7 +147,7 @@ function checkPost(post) {
     const n = countHashtags(ig.caption);
     if (n > IG_MAX_HASHTAGS) errors.push(`Instagram caption has ${n} hashtags. Instagram allows ${IG_MAX_HASHTAGS} (anything like "#1" counts).`);
     if (ig.caption.length > IG_MAX_CAPTION) errors.push(`Instagram caption is ${ig.caption.length} characters. The limit is ${IG_MAX_CAPTION}.`);
-    if (images.length > IG_MAX_IMAGES) errors.push(`Instagram carousels take up to ${IG_MAX_IMAGES} images.`);
+    if (!video && images.length > IG_MAX_IMAGES) errors.push(`Instagram carousels take up to ${IG_MAX_IMAGES} images.`);
   }
   return { errors, warnings };
 }
@@ -147,6 +157,7 @@ function contentHash(post) {
   const relevant = {
     plannedAt: post.plannedAt,
     images: post.images,
+    video: post.video || null,
     instagram: post.instagram,
     facebook: post.facebook,
   };
@@ -232,9 +243,15 @@ function cleanPost(input) {
     .filter((x) => x.name || x.url)
     .slice(0, 20);
   const n = images.length;
+  let video = null;
+  if (input.video && /^https:\/\//i.test(String(input.video.url || ''))) {
+    const num = (v) => (Number.isFinite(+v) && +v > 0 ? Math.round(+v) : undefined);
+    video = { url: String(input.video.url).trim(), width: num(input.video.width), height: num(input.video.height), duration: num(input.video.duration) };
+  }
   return {
     title: str(input.title, 200).trim(),
-    format: str(input.format, 100).trim() || (n > 1 ? `${n}-slide carousel` : 'Single image'),
+    format: str(input.format, 100).trim() || (video ? 'Video (Reel)' : n > 1 ? `${n}-slide carousel` : 'Single image'),
+    video,
     plannedAt: new Date(input.plannedAt).toString() === 'Invalid Date' ? '' : new Date(input.plannedAt).toISOString(),
     images,
     instagram: side(input.instagram, true),
@@ -264,12 +281,19 @@ function absoluteUrl(u) {
 
 async function schedulePost(post) {
   const c = cfg();
-  const mediaUrls = (post.images || []).map(absoluteUrl);
+  const video = post.video?.url ? absoluteUrl(post.video.url) : null;
+  const cover = video && post.images?.[0] ? absoluteUrl(post.images[0]) : null;
+  const mediaUrls = video ? [video] : (post.images || []).map(absoluteUrl);
   const results = {};
   const errors = [];
   if (post.instagram?.caption) {
     try {
       const target = { targetType: 'instagram' };
+      if (video) {
+        target.mediaType = 'reel';
+        target.shareToFeed = true;
+        if (cover) target.coverImageUrl = cover;
+      }
       if (post.instagram.altText) target.altText = post.instagram.altText;
       if (post.instagram.firstComment) target.firstComment = post.instagram.firstComment;
       const r = await blotatoCreatePost({
@@ -326,7 +350,7 @@ async function notifyDecision(post, row) {
   const lines = [
     `<p><b>${escHtml(row.reviewer_name)}</b> ${approved ? 'approved' : 'requested changes to'} <b>${escHtml(post.title)}</b>.</p>`,
     row.notes ? `<p><b>Notes:</b><br>${escHtml(row.notes).replace(/\n/g, '<br>')}</p>` : '',
-    approved ? `<p>${escHtml(scheduleText(row, post))}</p>` : '<p>Once it\'s revised and redeployed, it goes back to Waiting for another review.</p>',
+    approved ? `<p>${escHtml(scheduleText(row, post))}</p>` : '<p>Edit it on the admin page to send it back for another review.</p>',
     `<p><a href="${c.publicBase}/?tab=approvals">Open the Approvals tab</a></p>`,
   ];
   try {
@@ -398,6 +422,8 @@ function view(post, d) {
     format: post.format,
     plannedAt: post.plannedAt,
     images: post.images || [],
+    video: post.video || null,
+    submittedAt: post._submittedAt || null,
     instagram: post.instagram || null,
     facebook: post.facebook || null,
     sources: post.sources || [],
@@ -618,6 +644,81 @@ function adminRouter() {
     }
   });
 
+  // Videos are too big for the free Supabase plan, so they go straight from
+  // the browser to Blotato's storage (where they'll be published from anyway).
+  r.post('/video-upload', async (req, res) => {
+    try {
+      const c = cfg();
+      if (!c.blotatoKey) { res.status(503).json({ error: 'BLOTATO_API_KEY is not set.' }); return; }
+      const name = String(req.body?.filename || 'video.mp4');
+      if (!/\.(mp4|mov|m4v)$/i.test(name)) { res.status(400).json({ error: 'Videos must be MP4 or MOV.' }); return; }
+      const clean = name.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+/, '').slice(-60);
+      const resp = await fetch(`${c.blotatoBase}/v2/media/uploads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'blotato-api-key': c.blotatoKey },
+        body: JSON.stringify({ filename: `ru-${Date.now()}-${clean}` }),
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok || !body.presignedUrl) throw new Error(`Blotato ${resp.status}: ${JSON.stringify(body).slice(0, 200)}`);
+      res.json({ uploadUrl: body.presignedUrl, publicUrl: body.publicUrl });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
+  // Emails Paige and Andy one message listing every post waiting for them.
+  r.post('/submit', async (req, res) => {
+    try {
+      const c = cfg();
+      if (!c.resendKey) { res.status(503).json({ error: 'Email is not set up (RESEND_API_KEY missing).' }); return; }
+      if (!c.approverEmails.length) { res.status(503).json({ error: 'No approver emails set (APPROVER_EMAILS).' }); return; }
+      const [queue, decisions] = await Promise.all([loadQueue(), getDecisions()]);
+      const pending = queue
+        .map((p) => ({ p, v: view(p, decisions[p.id]) }))
+        .filter(({ v }) => v.status === 'pending' && !v.checks.errors.length)
+        .sort((a, b) => new Date(a.v.plannedAt) - new Date(b.v.plannedAt));
+      if (!pending.length) { res.status(400).json({ error: 'Nothing is waiting for approval.' }); return; }
+      const link = `${c.publicBase}/?tab=approvals`;
+      const fmt = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' ET';
+      const rows = pending.map(({ v }) => {
+        const thumb = v.images[0]
+          ? `<img src="${escHtml(absoluteUrl(v.images[0]))}" width="72" height="90" style="object-fit:cover;border-radius:6px;display:block" alt="">`
+          : '<div style="width:72px;height:90px;border-radius:6px;background:#0B1F2E;color:#fff;font:12px Arial;text-align:center;line-height:90px">Video</div>';
+        return `<tr><td style="padding:10px 12px 10px 0;vertical-align:top">${thumb}</td><td style="padding:10px 0;vertical-align:top;font:14px Arial;color:#182433"><b>${escHtml(v.title)}</b><br><span style="color:#6B6F73;font-size:13px">${escHtml(fmt(v.plannedAt))} · ${escHtml(v.format || '')}</span>${v.notesForReviewer ? `<br><span style="font-size:13px">Note: ${escHtml(v.notesForReviewer)}</span>` : ''}</td></tr>`;
+      }).join('');
+      const n = pending.length;
+      const html = `<div style="font:15px Arial;color:#182433;max-width:560px">
+        <p>Hi Paige and Andy,</p>
+        <p>${n === 1 ? 'A new post is' : `${n} new posts are`} ready for your approval. Nothing goes out until one of you approves it.</p>
+        <table cellpadding="0" cellspacing="0" style="border-collapse:collapse">${rows}</table>
+        <p style="margin:22px 0"><a href="${link}" style="background:#C99A4A;color:#fff;text-decoration:none;padding:12px 22px;border-radius:22px;font-weight:bold">Review and approve</a></p>
+        <p style="font-size:13px;color:#6B6F73">Use the review passcode we gave you. Reply to this email with any questions.<br>Barry, Charleston Media Group</p></div>`;
+      const resp = await fetch(`${env('RESEND_API_BASE', 'https://api.resend.com')}/emails`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${c.resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: c.notifyFrom, to: c.approverEmails, reply_to: c.replyTo, cc: c.replyTo ? [c.replyTo] : undefined,
+          subject: n === 1 ? `Ready for approval: ${pending[0].v.title}` : `${n} Renew Urban posts ready for approval`,
+          html,
+        }),
+      });
+      if (!resp.ok) {
+        const t = (await resp.text()).slice(0, 300);
+        const hint = /verify a domain|testing emails|own email/i.test(t) ? ' Resend will only email other people once chsmediagroup.com is verified there.' : '';
+        res.status(502).json({ error: `Email didn't send (Resend ${resp.status}).${hint} ${t}` });
+        return;
+      }
+      const now = new Date().toISOString();
+      const ids = pending.filter(({ p }) => p._source === 'admin').map(({ p }) => p.id);
+      if (ids.length) {
+        await sb('PATCH', `?id=in.(${ids.map(encodeURIComponent).join(',')})`, { submitted_at: now }, { Prefer: 'return=minimal' }, QUEUE_TABLE);
+      }
+      res.json({ ok: true, sent: n, to: c.approverEmails });
+    } catch (err) {
+      res.status(500).json({ error: String(err.message || err) });
+    }
+  });
+
   // Create (no id) or update (id) a post. Saving any change sends it back to
   // pending, because the content hash changes.
   r.post('/posts', async (req, res) => {
@@ -647,7 +748,7 @@ function adminRouter() {
         return;
       }
       const now = new Date().toISOString();
-      await sb('POST', '?on_conflict=id', { id, post, active: true, updated_at: now }, {
+      await sb('POST', '?on_conflict=id', { id, post, active: true, updated_at: now, submitted_at: null }, {
         Prefer: 'resolution=merge-duplicates,return=minimal',
       }, QUEUE_TABLE);
       res.json({ id, warnings });
