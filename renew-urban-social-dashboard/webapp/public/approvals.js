@@ -116,6 +116,7 @@
   }
 
   function slides(p){
+    if(p.video&&p.video.url) return `<div class="ap-stage ap-vstage"><video src="${esc(p.video.url)}" ${p.images&&p.images[0]?`poster="${esc(p.images[0])}"`:''} controls playsinline preload="metadata"></video></div>`;
     const imgs=p.images||[]; if(!imgs.length) return '<div class="ap-noimg">No image</div>';
     const i=Math.min(slideIdx[p.id]||0,imgs.length-1);
     const nav=imgs.length>1?`
